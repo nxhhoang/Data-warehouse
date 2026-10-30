@@ -1,0 +1,701 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usefonttheme{structurebold}
+\usefonttheme[onlymath]{serif}
+
+\definecolor{BKTemplate}{rgb}{0.11765, 0.30588, 0.47451}
+\usecolortheme[named=BKTemplate]{structure}
+\setbeamercolor{title}{fg=BKTemplate,bg=}
+\setbeamertemplate{caption}[numbered]
+
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}    % use 8-bit T1 fonts
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{mathtools}
+\usepackage{multicol}
+\usepackage{comment}
+\usepackage{forest}
+\usepackage[linesnumbered, ruled]{algorithm2e}
+\usepackage{algorithmic}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{graphicx}
+\usepackage{diagbox}
+\usepackage{tikz}
+\usetikzlibrary{positioning, shapes.geometric, arrows.meta}
+\usepackage{subcaption}
+% \captionsetup[subfigure]{labelsep=space}
+\usepackage{amsmath}
+\usepackage{dsfont}
+\usepackage{stmaryrd}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage[dvipsnames]{xcolor} % Sử dụng màu mở rộng
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.97,0.98,0.90}
+\lstdefinestyle{mystyle}{
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{blue},
+  numberstyle=\footnotesize\color{codegray},
+  stringstyle=\color{codepurple},
+  basicstyle=\ttfamily\small,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=10pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=4,
+  language=C++,
+  escapeinside={(*@}{@*)}
+}
+\lstset{style=mystyle}
+\lstdefinelanguage{JavaScript}{
+  keywords={break,case,catch,class,const,continue,default,delete,do,else,export,extends,finally,for,from,function,if,import,in,instanceof,let,new,of,return,static,super,switch,this,throw,try,typeof,var,void,while,yield,async,await},
+  keywordstyle=\color{blue},
+  ndkeywords={true,false,null,undefined},
+  ndkeywordstyle=\color{Magenta},
+  identifierstyle=,
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{codegreen},
+  morestring=[b]',
+  morestring=[b]",
+  stringstyle=\color{codepurple}
+}
+
+\renewcommand{\footnotesize}{\tiny}
+\newcommand{\mathbi}[1]{\boldsymbol{#1}}
+\newtheorem{proposition}{Proposition}
+
+%------------------------------------------------------------
+%This block of code defines the information to appear in the
+%Title page
+\title[AWS Cloud Services -- Seminar] %optional
+{\vspace*{1cm}\\ \textbf{DATA WAREHOUSE AND DECISION SUPPORT SYSTEM} \\ \textbf{FOR MARKETING}
+}
+
+\subtitle{}
+
+\author[DW and DSS] % (optional)
+{Supervisor: Thoại Nam \\
+  Student: Nguyễn Xuân Huy Hoàng - 2311070 - Marketing\\
+  Student: Trần Vĩnh Dũng - 2310574 - Marketing\\
+  Student: Bùi Trọng Hiển - 2313912 - Marketing
+}
+\institute[CO4031] % (optional)
+{
+  Faculty of Computer Science and Technology\\
+  Ho Chi Minh City University of Technology\\
+  Vietnam National University Ho Chi Minh City
+}
+
+\date[October 2026] % (optional)
+{October $28^{th}$ 2026}
+
+%End of title page configuration block
+%------------------------------------------------------------
+
+%------------------------------------------------------------
+%The next block of commands puts the table of contents at the
+%beginning of each section and highlights the current section:
+
+\AtBeginSection[]
+{
+  \begin{frame}
+    \frametitle{Table of Contents}
+    \tableofcontents[currentsection]
+  \end{frame}
+}
+%------------------------------------------------------------
+
+%------------------------------------------------------------
+% Lệnh này tự động chèn slide mục lục mỗi khi bắt đầu một Subsection mới
+\AtBeginSubsection[]
+{
+  \begin{frame}
+    \frametitle{Table of Contents}
+    % Tham số currentsection và currentsubsection giúp làm mờ các mục khác
+    % và chỉ in đậm section/subsection hiện tại
+    \tableofcontents[currentsection, currentsubsection]
+  \end{frame}
+}
+%------------------------------------------------------------
+
+\begin{document}
+
+% ===== Helper: khung placeholder cho hình minh họa =====
+% Dùng: \imgph{đường-dẫn-file}{mô tả hình cần chèn}{chiều cao}
+% Nếu file tồn tại thì chèn ảnh, ngược lại vẽ khung placeholder.
+\newcommand{\imgph}[3]{%
+  \IfFileExists{#1}{%
+    \includegraphics[width=\linewidth]{#1}%
+  }{%
+    \fbox{\parbox[c][#3][c]{\linewidth}{\centering\scriptsize #2\\[3pt]\texttt{#1}}}%
+  }%
+}
+
+% The next statement creates the title page.
+\setbeamertemplate{background canvas}{
+  \includegraphics[width=\paperwidth,height=\paperheight]{images/FrontBackground.pdf}
+}
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% Set background for all pages
+\setbeamertemplate{background canvas}{
+  \includegraphics[width=\paperwidth,height=\paperheight]{images/Background.pdf}
+}
+
+%---------------------------------------------------------
+%This block of code is for the table of contents after
+%the title page
+\begin{frame}
+  \frametitle{Table of Contents}
+  \tableofcontents
+\end{frame}
+
+%---------------------------------------------------------
+\section{Introduction}
+%---------------------------------------------------------
+
+\begin{frame}{Amazon Web Services}
+  \small
+  \begin{columns}[T]
+    \column{0.55\textwidth}
+
+    % Ép tất cả các cấp itemize đều giữ nguyên kích thước \small
+    \setbeamerfont{itemize/enumerate body}{size=\small}
+    \setbeamerfont{itemize/enumerate subbody}{size=\small}
+
+    \begin{itemize}
+        \setlength{\itemsep}{0.3em}
+
+      \item \textbf{Nền tảng Cloud hàng đầu}: Đứng đầu thị phần toàn cầu, cung cấp hệ sinh thái hơn 200 dịch vụ đáp ứng mọi nhu cầu CNTT.
+
+      \item \textbf{Mạng lưới hạ tầng vật lý}:
+        \begin{itemize}
+            \setlength{\itemsep}{0.1em}
+          \item \textbf{Region}: Các khu vực địa lý độc lập trên toàn thế giới.
+          \item \textbf{Availability Zone}: Các trung tâm dữ liệu riêng biệt trong mỗi Region giúp tăng khả năng chịu lỗi.
+        \end{itemize}
+
+      \item \textbf{Ưu điểm vượt trội}:
+        \begin{itemize}
+            \setlength{\itemsep}{0.1em}
+          \item \textbf{Scalability}: Khả năng nâng cấp hoặc thu nhỏ tài nguyên tức thì.
+          \item \textbf{High Availability}: Đảm bảo hệ thống hoạt động liên tục không gián đoạn.
+        \end{itemize}
+
+    \end{itemize}
+
+    \column{0.43\textwidth}
+    \begin{figure}[h]
+      \centering
+      \includegraphics[width=0.8\textwidth]{images/aws/overview.png}
+      \caption{Bản đồ hạ tầng toàn cầu gồm Region và Availability Zone của AWS \\ \footnotesize Nguồn: \href{https://storage.googleapis.com/drzomuvdsndzue/what-are-the-main-benefits-of-aws-regions.html}
+      {What Are The Main Benefits Of Aws Regions at Matthew Calzada blog}
+      \label{fig:aws_regions}
+      }
+    \end{figure}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Các nhóm dịch vụ chính của AWS}
+  \small
+  \renewcommand{\arraystretch}{1.3}
+  \centering
+
+  \begin{tabular}{@{}p{0.52\textwidth}p{0.42\textwidth}@{}}
+    \toprule
+    \textbf{Nhóm dịch vụ} & \textbf{Ví dụ} \\
+    \midrule
+    Compute
+    & Amazon EC2, AWS Lambda \\
+
+    Storage
+    & Amazon S3, Amazon EBS \\
+
+    Database
+    & Amazon RDS, Amazon DynamoDB \\
+
+    Networking \& Content Delivery
+    & Amazon VPC, CloudFront, Route 53 \\
+
+    Security, Identity \& Compliance
+    & AWS IAM, AWS KMS \\
+
+    Application Integration
+    & Amazon SNS, Amazon SQS, EventBridge \\
+
+    Monitoring \& Management
+    & Amazon CloudWatch, AWS CloudTrail \\
+
+    Internet of Things
+    & AWS IoT Core \\
+
+    AI \& Machine Learning
+    & Amazon SageMaker, Amazon Bedrock \\
+    \bottomrule
+  \end{tabular}
+\end{frame}
+
+\begin{frame}{Các nhóm dịch vụ AWS được đề cập}
+  % \footnotesize
+  % \renewcommand{\arraystretch}{1}
+  \centering
+
+  \begin{tabular}{@{}p{0.20\textwidth}p{0.24\textwidth}p{0.50\textwidth}@{}}
+    \toprule
+    \textbf{Mảng} & \textbf{Dịch vụ AWS} & \textbf{Vai trò} \\
+    \midrule
+
+    \textbf{IoT}
+    & \textbf{AWS IoT Core}
+    & Thu nhận dữ liệu từ thiết bị IoT qua MQTT \\
+    & Amazon SNS
+    & Phân phối thông báo và cảnh báo \\
+    \midrule
+
+    \textbf{Serverless}
+    & \textbf{AWS Lambda}
+    & Chạy code mà không cần tự quản lý máy chủ \\
+    & Amazon API Gateway
+    & Tạo API và chuyển request tới Lambda \\
+    & Amazon DynamoDB
+    & Cơ sở dữ liệu NoSQL có khả năng mở rộng \\
+    & Amazon S3
+    & Lưu trữ file, phát sự kiện khi có file mới \\
+    & Amazon EventBridge
+    & Định tuyến sự kiện và chạy tác vụ theo lịch \\
+    & Amazon SQS \& Step Functions
+    & Hàng đợi xử lý bất đồng bộ và điều phối workflow \\
+    \midrule
+
+    \textbf{ML Offerings}
+    & \textbf{Amazon SageMaker}
+    & Xây dựng, huấn luyện và triển khai mô hình ML \\
+    & Amazon Bedrock
+    & Truy cập mô hình generative AI qua API \\
+    \bottomrule
+  \end{tabular}
+\end{frame}
+
+%---------------------------------------------------------
+\section{Iot on AWS}
+%---------------------------------------------------------
+
+% \begin{frame}{AWS IoT Core -- What \& Why?}
+%   \small
+%   % Ép tất cả văn bản trong block và itemize cùng cỡ \small
+%   \setbeamerfont{block title}{size=\small}
+%   \setbeamerfont{block body}{size=\small}
+%   \setbeamerfont{itemize/enumerate body}{size=\small}
+%   \setbeamerfont{itemize/enumerate subbody}{size=\small}
+
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.48\textwidth}
+%     \begin{block}{What is AWS IoT Core?}
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.3em}
+%         \item \textbf{Dịch vụ Managed}: Cho phép hàng triệu thiết bị IoT kết nối an toàn tới AWS.
+%         \item \textbf{Giao thức MQTT}: Tối ưu cho thiết bị phần cứng giới hạn tài nguyên.
+%         \item \textbf{Device Registry}: Quản lý danh tính và trạng thái thiết bị tập trung.
+%         \item \textbf{Rules Engine}: Lọc và định tuyến dữ liệu tự động tới các dịch vụ AWS.
+%       \end{itemize}
+%     \end{block}
+
+%     \column{0.48\textwidth}
+%     \begin{block}{Why Choose AWS IoT Core?}
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.3em}
+%         \item \textbf{So với Broker tự dựng}: Bỏ qua chi phí vận hành, nâng cấp hạ tầng, vá lỗi bảo mật.
+%         \item \textbf{Bảo mật mặc định}: Tích hợp sẵn mã hóa TLS và xác thực bằng chứng chỉ X.509.
+%         \item \textbf{Tự động mở rộng}: Đáp ứng linh hoạt từ vài thiết bị đến hàng tỷ kết nối.
+%         \item \textbf{Mô hình chi phí}: Trả phí theo số lượng message xử lý thực tế.
+%       \end{itemize}
+%     \end{block}
+%   \end{columns}
+% \end{frame}
+
+% \begin{frame}{AWS IoT Core -- Core Concepts}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.55\textwidth}
+%     \begin{itemize}
+%       \item \textbf{Thing:} đại diện một thiết bị trong Registry
+%         (quản lý danh tính, chứng chỉ).
+%       \item \textbf{Chứng chỉ X.509 + Policy:} xác thực hai chiều
+%         (mutual TLS); policy giới hạn topic thiết bị được phát.
+%       \item \textbf{MQTT topic:} kênh publish/subscribe,
+%         ví dụ \texttt{device/dev-01/reading}.
+%       \item \textbf{IoT Rule:} câu SQL lọc message --
+%         \texttt{SELECT * FROM 'device/+/reading'} -- và
+%         \textbf{action} chuyển tiếp: Lambda, S3, DynamoDB, SQS, \ldots
+%       \item \textbf{Device Shadow:} bản sao trạng thái thiết bị,
+%         dùng được cả khi thiết bị offline.
+%     \end{itemize}
+%     \column{0.42\textwidth}
+%     \imgph{./images/aws/iot-core.png}{Hình gợi ý: kiến trúc AWS IoT Core (thiết bị $\rightarrow$ broker $\rightarrow$ rules)}{3.8cm}
+%   \end{columns}
+% \end{frame}
+
+% \begin{frame}{AWS IoT Core -- Core Concepts}
+%   \small
+%   \setbeamerfont{itemize/enumerate body}{size=\small}
+%   \setbeamerfont{itemize/enumerate subbody}{size=\small}
+
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.55\textwidth}
+%     \begin{itemize}
+%         \setlength{\itemsep}{0.3em}
+
+%       \item \textbf{Device Identity \& Security}:
+%         \begin{itemize}
+%             \setlength{\itemsep}{0.1em}
+%           \item \textbf{Thing Registry}: Quản lý định danh và thuộc tính thiết bị.
+%           \item \textbf{X.509 Certificate}: Mã hóa và xác thực TLS hai chiều.
+%           \item \textbf{IoT Policy}: Cấp quyền chi tiết cho từng thiết bị.
+%         \end{itemize}
+
+%       \item \textbf{Message Routing}:
+%         \begin{itemize}
+%             \setlength{\itemsep}{0.1em}
+%           \item \textbf{MQTT Broker}: Trao đổi dữ liệu dạng Publish/Subscribe.
+%           \item \textbf{Rules Engine}: Lọc dữ liệu bằng câu lệnh SQL và chuyển tiếp tới S3, Lambda, DynamoDB.
+%         \end{itemize}
+
+%       \item \textbf{State Management}:
+%         \begin{itemize}
+%           \item \textbf{Device Shadow}: Đồng bộ trạng thái thiết bị kể cả khi mất kết nối.
+%         \end{itemize}
+
+%     \end{itemize}
+
+%     \column{0.42\textwidth}
+%     \imgph{./images/aws/iot-core.png}{Sơ đồ kiến trúc AWS IoT Core từ thiết bị đến các dịch vụ xử lý}{3.8cm}
+%   \end{columns}
+% \end{frame}
+
+% \begin{frame}{AWS IoT Core -- How It Works \& Key Features}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.54\textwidth}
+%     \textbf{Luồng xử lý}
+%     \begin{enumerate}
+%       \item Thiết bị kết nối endpoint qua \textbf{TLS} với chứng chỉ
+%         X.509 của nó.
+%       \item \textbf{Publish} message JSON lên topic,
+%         ví dụ \texttt{device/dev-01/reading}.
+%       \item \textbf{IoT Rule} khớp topic, áp SQL trích nội dung.
+%       \item \textbf{Action} chuyển tiếp đến dịch vụ đích
+%         (Lambda, S3, SQS, \ldots).
+%     \end{enumerate}
+%     \vspace{0.15cm}
+%     \textbf{Key features:} MQTT QoS 0/1; HTTP \& WebSocket;
+%     mutual TLS; Device Shadow; tính phí theo message.
+%     \column{0.42\textwidth}
+%     \centering
+%     \begin{tikzpicture}[
+%         font=\scriptsize, node distance=0.35cm,
+%         box/.style={draw=BKTemplate, fill=BKTemplate!8, rounded corners=2pt,
+%         minimum height=0.55cm, text width=3.6cm, align=center},
+%         ar/.style={-{Stealth[length=2.5mm]}, thick, BKTemplate}
+%       ]
+%       \node[box] (a) {Thiết bị + chứng chỉ X.509};
+%       \node[box, below=of a] (b) {Broker: theo dõi topic};
+%       \node[box, below=of b] (c) {IoT Rule: SELECT \ldots};
+%       \node[box, below=of c] (d) {Action: Lambda, S3, \ldots};
+%       \draw[ar] (a) -- (b);
+%       \draw[ar] (b) -- (c);
+%       \draw[ar] (c) -- (d);
+%     \end{tikzpicture}
+%   \end{columns}
+% \end{frame}
+
+\begin{frame}{AWS IoT -- Kiến trúc và các dịch vụ liên quan}
+  \centering
+  \begin{tikzpicture}[
+      >=stealth,
+      svc/.style={
+        draw, rounded corners=3pt, align=center,
+        minimum width=2.8cm, text width=2.6cm,
+        minimum height=0.8cm,
+        inner sep=2pt, font=\scriptsize
+      },
+      arr/.style={->, thick},
+      lbl/.style={font=\tiny, inner sep=1pt}
+    ]
+
+    \node[svc, fill=gray!10]   (dev)    at (0,    2.8) {\textbf{Thiết bị IoT}\\ Gửi dữ liệu};
+    \node[svc, fill=blue!12]   (core)   at (3.6,  2.8) {\textbf{AWS IoT Core}\\ Nhận qua MQTT};
+    \node[svc, fill=orange!18] (lambda) at (7.2,  2.8) {\textbf{AWS Lambda}\\ Xử lý dữ liệu};
+    \node[svc, fill=green!12]  (db)     at (10.8, 2.8) {\textbf{Amazon DynamoDB}\\ Lưu dữ liệu};
+
+    \node[svc, fill=purple!12] (sns)    at (3.6,  1.4) {\textbf{Amazon SNS}\\ Gửi thông báo};
+    \node[svc, fill=gray!10]   (user)   at (7.2,  1.4) {\textbf{Email / SMS}\\ Nhận cảnh báo};
+
+    \node[svc, fill=yellow!20, dashed, minimum width=13.6cm,
+    text width=13.2cm, minimum height=0.6cm] (iam) at (5.4, 0.2)
+    {\textbf{AWS IAM} -- Kiểm soát quyền truy cập và phân quyền giữa các dịch vụ Cloud};
+
+    \draw[arr] (dev)    -- node[above=1pt, lbl] {MQTT} (core);
+    \draw[arr] (core)   -- node[above=1pt, lbl] {Rule} (lambda);
+    \draw[arr] (lambda) -- (db);
+
+    \draw[arr] (core) -- node[right=2pt, lbl] {Rule} (sns);
+    \draw[arr] (sns)  -- (user);
+
+  \end{tikzpicture}
+
+  \vspace{0.15cm}
+  \begin{flushleft}
+    \scriptsize
+    \textbf{Luồng dữ liệu:} Thiết bị $\rightarrow$ IoT Core $\rightarrow$ Lambda
+    $\rightarrow$ DynamoDB (thu nhận, xử lý và lưu dữ liệu cảm biến).\\
+    \textbf{Luồng cảnh báo:} IoT Core $\rightarrow$ SNS $\rightarrow$
+    Email / SMS (thông báo khi dữ liệu vượt ngưỡng).
+  \end{flushleft}
+\end{frame}
+
+\begin{frame}{AWS IoT Core -- Kết nối thiết bị với đám mây}
+  \small
+  \begin{columns}[T,onlytextwidth]
+    \column{0.58\textwidth}
+    \begin{itemize}
+      \item \textbf{Định nghĩa:} dịch vụ được quản lý hoàn toàn,
+        giúp \textbf{thiết bị IoT kết nối an toàn} với đám mây
+        và với nhau, không cần tự dựng máy chủ.
+      \item \textbf{Giao thức:} \textbf{MQTT}, HTTPS, WebSocket.
+      \item \textbf{Message broker:} nhận và \textbf{định tuyến
+        tin nhắn} theo mô hình publish/subscribe.
+      \item \textbf{Rules Engine:} lọc dữ liệu bằng câu lệnh
+        giống SQL, rồi \textbf{chuyển tới dịch vụ khác}
+        (Lambda, DynamoDB, S3, SNS, \ldots).
+      \item \textbf{Bảo mật:} xác thực thiết bị bằng
+        \textbf{chứng chỉ X.509}, phân quyền bằng policy.
+    \end{itemize}
+    \column{0.38\textwidth}
+    \begin{block}{Mô hình Publish / Subscribe}
+      \footnotesize
+      \begin{itemize}
+        \item \textbf{Thiết bị} publish lên một \textit{topic}
+        \item \textbf{Broker} nhận và chuyển tiếp
+        \item \textbf{Bên đăng ký} (subscriber) nhận tin
+      \end{itemize}
+      \vspace{0.1cm}
+      \textit{Ví dụ:} cảm biến publish lên topic
+      \texttt{sensor/temp}, Rule lọc nhiệt độ vượt ngưỡng
+      rồi gọi Lambda hoặc SNS.
+    \end{block}
+  \end{columns}
+\end{frame}
+
+% ============ AMAZON SNS ============
+\begin{frame}{Amazon SNS -- Simple Notification Service}
+  \small
+  \begin{columns}[T,onlytextwidth]
+    \column{0.58\textwidth}
+    \begin{itemize}
+      \item \textbf{Định nghĩa:} dịch vụ \textbf{nhắn tin
+        publish/subscribe} được quản lý hoàn toàn, dùng để
+        \textbf{phân phối thông báo và cảnh báo}.
+      \item \textbf{Topic:} kênh nhận tin từ \textbf{publisher},
+        mỗi topic có nhiều \textbf{subscriber}.
+      \item \textbf{Fan-out:} một tin nhắn được \textbf{gửi đồng
+        thời} tới nhiều đích.
+      \item \textbf{Đích nhận:} Email, SMS, mobile push, HTTP/S,
+        Lambda, SQS, \ldots
+      \item \textbf{Cơ chế đẩy:} gửi ngay khi có tin,
+        người nhận không cần hỏi lại.
+    \end{itemize}
+    \column{0.38\textwidth}
+    \begin{block}{Luồng xử lý}
+      \centering
+      \footnotesize
+      Publisher (IoT Core, Lambda)\\
+      $\downarrow$ \\
+      \textbf{SNS Topic}\\
+      $\downarrow$ \\
+      Email $\bullet$ SMS $\bullet$ Lambda $\bullet$ SQS
+    \end{block}
+  \end{columns}
+\end{frame}
+
+%=============================================%
+\section{Serverless on AWS}
+%=============================================%
+
+\begin{frame}{AWS Serverless -- Kiến trúc và các dịch vụ liên quan}
+  \centering
+  \begin{tikzpicture}[
+      >=stealth,
+      svc/.style={
+        draw, rounded corners=3pt, align=center,
+        minimum width=2.6cm, minimum height=0.8cm,
+        inner sep=2pt, font=\scriptsize
+      },
+      arr/.style={->, thick}
+    ]
+
+    \node[svc, fill=gray!10]   (client) at (0,   2.6) {\textbf{Client / Frontend}\\ Gửi request};
+    \node[svc, fill=blue!12]   (api)    at (3.3, 2.6) {\textbf{Amazon API Gateway}\\ Tiếp nhận request};
+    \node[svc, fill=orange!18] (lambda) at (6.6, 2.6) {\textbf{AWS Lambda}\\ Thực thi code};
+    \node[svc, fill=green!12]  (db)     at (9.9, 2.6) {\textbf{Amazon DynamoDB}\\ Lưu dữ liệu};
+
+    \node[svc, fill=green!12]  (s3)     at (9.9, 1.3) {\textbf{Amazon S3}\\ Lưu trữ file};
+
+    \node[svc, fill=purple!12] (eb)     at (9.9, 0)   {\textbf{Amazon EventBridge}\\ Sự kiện / lịch};
+    \node[svc, fill=red!10]    (sqs)    at (6.6, 0)   {\textbf{Amazon SQS}\\ Hàng đợi message};
+    \node[svc, fill=purple!12] (step)   at (3.3, 0)   {\textbf{AWS Step Functions}\\ Điều phối workflow};
+
+    \node[svc, fill=yellow!20, dashed, minimum width=12.6cm,
+    minimum height=0.6cm] (iam) at (4.95, -1.15)
+    {\textbf{AWS IAM} -- Kiểm soát quyền truy cập và phân quyền giữa các dịch vụ Cloud};
+
+    \draw[arr] (client) -- (api);
+    \draw[arr] (api)    -- (lambda);
+    \draw[arr] (lambda) -- (db);
+    \draw[arr] (lambda.south east) -- (s3.north west);
+
+    \draw[arr] (s3)  -- (eb);
+    \draw[arr] (eb)  -- (sqs);
+    \draw[arr] (sqs) -- (step);
+    \draw[arr] (step.north) -- ++(0,0.55) -| (lambda.south);
+
+  \end{tikzpicture}
+
+  \vspace{0.15cm}
+  \begin{flushleft}
+    \scriptsize
+    \textbf{Luồng chính:} Client $\rightarrow$ API Gateway $\rightarrow$ Lambda
+    $\rightarrow$ DynamoDB / S3 (backend không cần quản lý máy chủ).\\
+    \textbf{Luồng sự kiện:} S3 $\rightarrow$ EventBridge $\rightarrow$ SQS
+    $\rightarrow$ Step Functions $\rightarrow$ Lambda (xử lý bất đồng bộ, điều phối workflow).
+  \end{flushleft}
+\end{frame}
+
+% ============ AWS IAM ============
+\begin{frame}{AWS IAM -- Identity and Access Management}
+  \small
+  \begin{columns}[T,onlytextwidth]
+    \column{0.58\textwidth}
+    \begin{itemize}
+      \item \textbf{Định nghĩa:} dịch vụ \textbf{quản lý danh tính
+        và quyền truy cập} -- quyết định \textbf{ai} được làm
+        \textbf{gì} trên \textbf{tài nguyên nào} trong AWS.
+      \item \textbf{User:} danh tính của một người hoặc ứng dụng,
+        có thông tin đăng nhập riêng.
+      \item \textbf{Role:} danh tính \textbf{tạm thời} để dịch vụ
+        (ví dụ Lambda) hoặc user \textbf{đảm nhận} quyền.
+      \item \textbf{Policy:} tài liệu JSON mô tả quyền
+        \textbf{cho phép/từ chối} hành động.
+      \item \textbf{Nguyên tắc:} cấp \textbf{quyền tối thiểu}
+        (least privilege).
+    \end{itemize}
+    \column{0.38\textwidth}
+    \begin{block}{Mối quan hệ}
+      \footnotesize
+      \begin{itemize}
+        \item \textbf{User / Role} $\rightarrow$ \textit{ai}
+        \item \textbf{Policy} $\rightarrow$ \textit{được làm gì}
+        \item Gắn \textbf{Policy} vào \textbf{User/Role} để cấp quyền
+      \end{itemize}
+      \vspace{0.1cm}
+      \textit{Ví dụ:} Role cho Lambda + Policy chỉ cho phép
+      \texttt{dynamodb:PutItem}.
+    \end{block}
+  \end{columns}
+\end{frame}
+
+% ============ AWS LAMBDA ============
+\begin{frame}{AWS Lambda -- Function as a Service}
+  \small
+  \begin{columns}[T,onlytextwidth]
+    \column{0.58\textwidth}
+    \begin{itemize}
+      \item \textbf{Định nghĩa:} dịch vụ \textbf{chạy code không
+        cần quản lý máy chủ} (serverless compute).
+      \item \textbf{Chức năng:} tự động chạy function khi có
+        \textbf{sự kiện kích hoạt} (trigger) từ API Gateway, S3,
+        SQS, EventBridge, \ldots
+      \item \textbf{Tự động mở rộng:} từ vài đến hàng nghìn
+        request đồng thời.
+      \item \textbf{Trả phí theo mức dùng:} tính theo số lần gọi
+        và thời gian chạy (ms).
+      \item \textbf{Hỗ trợ:} Python, Node.js, Java, Go, \ldots
+    \end{itemize}
+    \column{0.38\textwidth}
+    \begin{block}{Cách hoạt động}
+      \footnotesize
+      \begin{enumerate}
+        \item \textbf{Sự kiện} xảy ra (request, file mới, lịch)
+        \item AWS \textbf{khởi chạy} function
+        \item Function \textbf{xử lý} và trả kết quả
+        \item Chạy xong thì \textbf{dừng}, không tính phí chờ
+      \end{enumerate}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+% ============ API GATEWAY ============
+\begin{frame}{Amazon API Gateway}
+  \small
+  \begin{columns}[onlytextwidth]
+    \column{0.58\textwidth}
+    \begin{itemize}
+      \item \textbf{Định nghĩa:} dịch vụ \textbf{tạo, công bố và
+        quản lý API} (REST, HTTP, WebSocket) ở quy mô lớn.
+      \item \textbf{Chức năng chính:} làm \textbf{cổng vào} --
+        nhận request từ client và \textbf{chuyển tới Lambda}
+        hoặc backend khác.
+      \item \textbf{Tính năng đi kèm:} xác thực, giới hạn lưu
+        lượng (throttling), cache, giám sát.
+      \item \textbf{Vai trò trong serverless:} kết nối
+        \textbf{Internet $\leftrightarrow$ Lambda}.
+    \end{itemize}
+    \column{0.38\textwidth}
+    \begin{block}{Luồng xử lý}
+      \footnotesize
+      \centering
+      Client\\
+      $\downarrow$ \\ \texttt{GET /items}\\
+      \textbf{API Gateway}\\
+      $\downarrow$ \\ kiểm tra, giới hạn lưu lượng\\
+      \textbf{Lambda}\\
+      $\downarrow$ \\
+      Phản hồi JSON về Client
+    \end{block}
+  \end{columns}
+\end{frame}
+
+
+
+\setbeamertemplate{footline}{}
+\begin{frame}
+  \centering
+  \vspace{1cm}
+  \textbf{\Huge{- THE END - }}\\
+  \vspace{0.2cm}
+  \itshape{\Large{Thank you for your attention}}\\
+  \vspace{15pt}
+  Acknowledgements:\\
+  I would like to express our sincere gratitude to our supervisor,\\
+  Mr. Thoại Nam \\
+\end{frame}
+
+\end{document}
