@@ -1,0 +1,335 @@
+% Preamble cần có: \usepackage{tabularx}  \usepackage{array}
+
+\section{Thiết kế mô hình chiều}
+\label{sec:dimensional-model}
+
+Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bước: chọn quy trình nghiệp vụ, khai báo grain, chọn dimension và xác định measure. Quy trình nghiệp vụ được chọn là \textbf{hành vi truy cập và mua hàng trên website thương mại điện tử}. Lược đồ gồm bốn bảng fact dùng chung tám bảng dimension (conformed dimensions), tạo thành nhiều lược đồ hình sao trên cùng một bus. Mọi bảng được dbt xây dựng trong vùng lõi của BigQuery.
+
+\subsection{Các bảng fact và grain}
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}X}
+\caption{Các bảng fact và grain}
+\label{tab:fact-grain} \\
+
+\hline
+\textbf{Bảng fact} & \textbf{Grain (1 dòng là)} & \textbf{Mục đích} \\
+\hline
+\endfirsthead
+
+% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
+\hline
+\textbf{Bảng fact} & \textbf{Grain (1 dòng là)} & \textbf{Mục đích} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{{Còn tiếp}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+\texttt{fct\_events}
+& Một sự kiện GA4 sau khi loại trùng
+& Đếm sự kiện, lượt xem trang, thời gian tương tác; phân tích chuỗi hành vi \\
+
+\texttt{fct\_sessions}
+& Một phiên (\texttt{user\_pseudo\_id}, \texttt{ga\_session\_id})
+& KPI theo phiên: phễu, chuyển đổi, doanh thu/phiên, chất lượng kênh \\
+
+\texttt{fct\_purchase\_items}
+& Một mặt hàng trong một giao dịch hợp lệ
+& Doanh thu và số lượng theo sản phẩm, danh mục \\
+
+\texttt{fct\_item\_events}
+& Một mặt hàng trong một sự kiện \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart} hoặc \texttt{begin\_checkout}
+& Phễu theo sản phẩm (lượt xem mặt hàng, thêm giỏ) \\
+
+\end{xltabular}
+
+
+
+
+\subsection{Chi tiết bảng fact}
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}X}
+\caption{Cấu trúc \texttt{fct\_events}}
+\label{tab:fct-events} \\
+
+\hline
+\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\hline
+\endfirsthead
+
+% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
+\hline
+\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{{Còn tiếp}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+\texttt{event\_id} & Khóa chính & Mã băm từ \texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name}, \texttt{event\_bundle\_sequence\_id} \\
+
+\texttt{date\_key} & FK $\rightarrow$ \texttt{dim\_date} & Ngày sự kiện \\
+
+\texttt{event\_key} & FK $\rightarrow$ \texttt{dim\_event} & Loại sự kiện \\
+
+\texttt{user\_key} & FK $\rightarrow$ \texttt{dim\_user} & Người dùng \\
+
+\texttt{device\_key} & FK $\rightarrow$ \texttt{dim\_device} & Thiết bị tại thời điểm sự kiện \\
+
+\texttt{geo\_key} & FK $\rightarrow$ \texttt{dim\_geo} & Địa lý tại thời điểm sự kiện \\
+
+\texttt{page\_key} & FK $\rightarrow$ \texttt{dim\_page} & Trang phát sinh sự kiện \\
+
+\texttt{traffic\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp phiên của phiên chứa sự kiện \\
+
+\texttt{session\_id} & Degenerate dimension & Nối sang \texttt{fct\_sessions} \\
+
+\texttt{event\_timestamp} & Thuộc tính & Thời điểm UTC; cột phân vùng theo ngày \\
+
+\texttt{engagement\_time\_msec} & Measure (cộng được) & Thời gian tương tác của sự kiện \\
+
+\end{xltabular}
+
+\renewcommand{\arraystretch}{1.4}
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}X}
+\caption{Cấu trúc \texttt{fct\_sessions}}
+\label{tab:fct-sessions} \\
+
+\hline
+\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\hline
+\endfirsthead
+
+% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
+\hline
+\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{{Còn tiếp}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+\texttt{session\_id} & Khóa chính & Ghép \texttt{user\_pseudo\_id} và \texttt{ga\_session\_id} \\
+
+\texttt{date\_key} & FK $\rightarrow$ \texttt{dim\_date} & Ngày của sự kiện đầu tiên trong phiên \\
+
+\texttt{user\_key} & FK $\rightarrow$ \texttt{dim\_user} & Người dùng \\
+
+\texttt{device\_key}, \texttt{geo\_key} & FK & Thiết bị và địa lý tại sự kiện đầu tiên của phiên \\
+
+\texttt{landing\_page\_key} & FK $\rightarrow$ \texttt{dim\_page} & Trang vào đầu tiên \\
+
+\texttt{session\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp phiên (vai trò 1) \\
+
+\texttt{user\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp người dùng (vai trò 2) \\
+
+\texttt{attribution\_basis} & Thuộc tính & \texttt{session} hoặc \texttt{user\_fallback}: cơ sở quy kết đã dùng \\
+
+\texttt{event\_count}, \texttt{page\_view\_count}, \texttt{view\_item\_count} & Measure (cộng được) & Số sự kiện, lượt xem trang, lượt xem sản phẩm \\
+
+\texttt{engagement\_time\_msec} & Measure (cộng được) & Tổng thời gian tương tác \\
+
+\texttt{is\_engaged}, \texttt{has\_view\_item}, \texttt{has\_add\_to\_cart}, \texttt{has\_begin\_checkout}, \texttt{has\_purchase} & Cờ 0/1 (cộng được) & Phiên có tương tác, đạt từng bước phễu; \texttt{has\_purchase} chỉ tính giao dịch hợp lệ \\
+
+\texttt{order\_count}, \texttt{revenue\_usd} & Measure (cộng được) & Số đơn và doanh thu của giao dịch hợp lệ \\
+
+\end{xltabular}
+
+
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}X}
+\caption{Cấu trúc \texttt{fct\_purchase\_items} và \texttt{fct\_item\_events}}
+\label{tab:fct-purchase-item-events}
+
+\small
+\renewcommand{\arraystretch}{1.25}
+
+\hline
+\textbf{Thành phần} & \textbf{\texttt{fct\_purchase\_items}} & \textbf{\texttt{fct\_item\_events}} & \textbf{Ghi chú} \\
+\hline
+\endfirsthead
+
+% \multicolumn{4}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
+\hline
+\textbf{Thành phần} & \textbf{\texttt{fct\_purchase\_items}} & \textbf{\texttt{fct\_item\_events}} & \textbf{Ghi chú} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{4}{r}{{Còn tiếp}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+Khóa chính
+& \texttt{purchase\_item\_id}
+& \texttt{item\_event\_id}
+& Mã băm của sự kiện và vị trí mặt hàng \\
+
+Khóa ngoại dùng chung
+& \multicolumn{2}{p{6.2cm}}{\texttt{date\_key}, \texttt{user\_key}, \texttt{device\_key}, \texttt{geo\_key}, \texttt{traffic\_source\_key} (nguồn cấp phiên), \texttt{product\_key}}
+& Cả hai bảng \\
+
+Khóa ngoại riêng
+& ---
+& \texttt{event\_key}
+& Phân biệt \texttt{view\_item}, \texttt{add\_to\_cart}, \ldots \\
+
+Degenerate dimension
+& \texttt{session\_id}, \texttt{transaction\_id}
+& \texttt{session\_id}
+& Nối sang \texttt{fct\_sessions} \\
+
+Measure
+& \texttt{quantity}, \texttt{price\_usd}, \texttt{item\_revenue\_usd}
+& \texttt{quantity} (mặc định 1)
+& Doanh thu cấp đơn không lưu lặp ở từng dòng mặt hàng \\
+
+\end{xltabular}
+
+
+
+\subsection{Các bảng dimension}
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}X}
+\caption{Các bảng dimension}
+\label{tab:dimensions}
+
+\small
+\renewcommand{\arraystretch}{1.25}
+
+\hline
+\textbf{Dimension} & \textbf{Khóa tự nhiên} & \textbf{Thuộc tính chính} \\
+\hline
+\endfirsthead
+
+% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
+\hline
+\textbf{Dimension} & \textbf{Khóa tự nhiên} & \textbf{Thuộc tính chính} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{{Còn tiếp}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+\texttt{dim\_date}
+& \texttt{event\_date}
+& Ngày, thứ, tuần, tháng, quý, cờ cuối tuần, cờ mùa mua sắm cuối năm, cờ \texttt{is\_add\_to\_cart\_tracked} \\
+
+\texttt{dim\_event}
+& \texttt{event\_name}
+& Nhóm sự kiện, thứ tự bước phễu, cờ thuộc phễu, cờ chuyển đổi \\
+
+\texttt{dim\_user}
+& \texttt{user\_pseudo\_id}
+& Ngày tiếp cận đầu tiên, cờ người dùng mới (\texttt{first\_visit}) \\
+
+\texttt{dim\_device}
+& Tổ hợp thuộc tính
+& Loại thiết bị, hệ điều hành, trình duyệt, ngôn ngữ \\
+
+\texttt{dim\_geo}
+& Tổ hợp thuộc tính
+& Châu lục, quốc gia, vùng, thành phố \\
+
+\texttt{dim\_page}
+& \texttt{page\_location} đã chuẩn hóa
+& Tên miền, đường dẫn, tiêu đề, loại trang (trang chủ, sản phẩm, giỏ hàng, thanh toán, khác) \\
+
+\texttt{dim\_product}
+& \texttt{item\_id}
+& Tên, thương hiệu, danh mục ba cấp (\texttt{item\_category} $\rightarrow$ \texttt{item\_category2} $\rightarrow$ \texttt{item\_category3}); thuộc tính lấy giá trị phổ biến nhất theo \texttt{item\_id} \\
+
+\texttt{dim\_traffic\_source}
+& (\texttt{source}, \texttt{medium}, \texttt{campaign})
+& Kênh đã gom nhóm theo bộ quy tắc của nhóm; nhóm ``Không xác định'' cho \texttt{<Other>} và \texttt{(data deleted)} \\
+
+\end{xltabular}
+
+Mỗi dimension dùng khóa thay thế (surrogate key) do dbt sinh ra, kèm một dòng ``Không xác định'' (khóa $-1$) để chứa giá trị thiếu hoặc bị ẩn danh. Do đó các khóa ngoại trong bảng fact không bao giờ NULL.
+
+\subsection{Ma trận bus}
+
+\begin{table}[H]
+\centering
+\caption{Ma trận bus: bảng fact và dimension dùng chung}
+\label{tab:bus-matrix}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|l|c|c|c|c|c|c|c|c|}
+\hline
+\textbf{Fact} & \textbf{Date} & \textbf{Event} & \textbf{User} & \textbf{Device} & \textbf{Geo} & \textbf{Page} & \textbf{Product} & \textbf{Traffic} \\
+\hline
+\texttt{fct\_events} & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & & $\bullet$ \\
+\texttt{fct\_sessions} & $\bullet$ & & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & & $\bullet\bullet$ \\
+\texttt{fct\_purchase\_items} & $\bullet$ & & $\bullet$ & $\bullet$ & $\bullet$ & & $\bullet$ & $\bullet$ \\
+\texttt{fct\_item\_events} & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & $\bullet$ & & $\bullet$ & $\bullet$ \\
+\hline
+\end{tabular}
+
+\vspace{0.1cm}
+\scriptsize{Hai dấu $\bullet\bullet$: dimension đóng hai vai trò (nguồn cấp phiên và nguồn cấp người dùng).}
+\end{table}
+
+\subsection{Bảng tổng hợp và ánh xạ KPI}
+
+Các bảng tổng hợp chỉ lưu tử số và mẫu số cộng được, không lưu tỷ lệ, vì tỷ lệ không cộng dồn được. Số người dùng và số phiên phân biệt cũng không cộng được qua các nhóm, nên chỉ lưu ở đúng mức grain của bảng.
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X}
+\caption{Bảng tổng hợp và nguồn dữ liệu của KPI}
+\label{tab:kpi-source}
+
+\small
+\renewcommand{\arraystretch}{1.25}
+
+\hline
+\textbf{Bảng tổng hợp} & \textbf{Grain} & \textbf{Nguồn và KPI phục vụ} \\
+\hline
+\endfirsthead
+
+% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
+\hline
+\textbf{Bảng tổng hợp} & \textbf{Grain} & \textbf{Nguồn và KPI phục vụ} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{3}{r}{{Còn tiếp}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+\texttt{fct\_daily\_ecommerce}
+& Ngày $\times$ kênh phiên $\times$ loại thiết bị
+& Từ \texttt{fct\_sessions}: số phiên, phiên có từng bước phễu, số đơn, doanh thu; suy ra tỷ lệ chuyển đổi, AOV, doanh thu/phiên \\
+
+\texttt{fct\_event\_counts}
+& Ngày $\times$ loại sự kiện $\times$ loại thiết bị
+& Từ \texttt{fct\_events}: số sự kiện, lượt xem trang \\
+
+\texttt{fct\_product\_performance}
+& Ngày $\times$ sản phẩm
+& Từ \texttt{fct\_item\_events} và \texttt{fct\_purchase\_items}: lượt xem, thêm giỏ, số lượng bán, doanh thu mặt hàng \\
+
+\end{xltabular}
+
+Doanh thu cấp phiên (\texttt{fct\_sessions}) và tổng \texttt{item\_revenue\_usd} (\texttt{fct\_purchase\_}\text{ }\texttt{ items}) được đối chiếu bằng kiểm thử dbt; chênh lệch được ghi vào nhật ký chất lượng dữ liệu.
