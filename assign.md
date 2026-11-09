@@ -1,0 +1,5 @@
+| Thành viên | Vai trò | Thư mục chính | Công việc chính (theo mốc) |
+| --- | --- | --- | --- |
+| **TVD** | Data Engineer | `src/extract/`, `src/pipeline/`, `data/quality_log/` | channels.yaml + trích xuất thử 1 tuần (G1); Publisher + Dataflow toàn bộ 92 ngày, làm phẳng, dựng phiên, loại trùng, nhật ký chất lượng (G2, M3); tự động hóa ETL |
+| **NXHH** | DW & KPI Engineer | `src/warehouse/`, `src/kpi/` | Lược đồ sao chi tiết (grain, khóa, measure — G1); dbt models staging→core→marts, dbt tests (G2–G3, M3–M4); view KPI + tối ưu truy vấn, benchmark (M4); chức năng truy vết số liệu (G5) |
+| **BTH** | Application Developer | `src/dashboard/`, `tests/`, `media/` | Wireframe + dashboard bản cơ bản: chức năng 1–6, bộ lọc, so sánh, phễu, drill-down (G4, M5); chức năng 7–10: phân khúc, cảnh báo, mô phỏng, kiểm thử tổng thể (G5, M6); |
