@@ -1,0 +1,48 @@
+# =====================================================================
+# Bộ quy tắc gom nhóm source/medium -> kênh
+# NGUỒN CHÂN LÝ DUY NHẤT: extract, pipeline, dbt và dashboard đều đọc
+# từ file này để tránh định nghĩa lệch nhau giữa các tầng.
+# Sản phẩm Giai đoạn 1 — chốt trước 30/10/2026 (mục 4.2 báo cáo).
+# =====================================================================
+version: 1
+
+# Các giá trị coi như "Không xác định" (ghi vào dim "Không xác định", khóa -1)
+unassigned:
+  sources: ["(direct)", "(not set)", "(none)", "<Other>", "(data deleted)"]
+  mediums: ["(not set)", "(none)", "<Other>", "(data deleted)"]
+
+# Quy tắc áp dụng THEO THỨ TỰ, khớp đầu tiên thắng
+rules:
+  - channel: direct
+    source: ["(direct)"]
+    medium: ["(none)"]
+
+  - channel: organic_search
+    medium: ["organic"]
+
+  - channel: paid_search
+    source: ["google"]
+    medium: ["cpc", "ppc"]
+
+  - channel: display
+    medium: ["display", "cpm"]
+
+  - channel: email
+    medium: ["email"]
+
+  - channel: affiliate
+    medium: ["affiliate"]
+
+  - channel: paid_social
+    medium: ["paid-social", "paidsocial"]
+
+  # TODO(G1): tách social_organic và referral theo danh sách source cụ thể
+  # sau khi khảo sát phân bố thực tế của bộ dữ liệu
+  - channel: social_organic
+    medium: ["social", "social-network", "social-media"]
+
+  - channel: referral
+    medium: ["referral"]
+
+# Giá trị mặc định khi không khớp quy tắc nào
+default_channel: unassigned

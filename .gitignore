@@ -1,0 +1,51 @@
+# ==== Secrets & môi trường ====
+.env
+*.key
+*service-account*.json
+config/gcp/*.json
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.streamlit/secrets.toml
+
+# ==== Dữ liệu cục bộ (không commit) ====
+data/raw/*
+data/interim/*
+data/quality_log/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/quality_log/.gitkeep
+
+# ==== dbt ====
+src/warehouse/target/
+src/warehouse/dbt_packages/
+src/warehouse/logs/
+
+# ==== LaTeX build artifacts ====
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.synctex.gz
+*.toc
+*.xdv
+
+# ==== Media nặng (bản final để Google Drive) ====
+media/*.mp4
+media/*.webm
+media/*.mov
+
+# ==== OS ====
+.DS_Store
+Thumbs.db
+desktop.ini

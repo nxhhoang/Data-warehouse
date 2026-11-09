@@ -1,0 +1,33 @@
+# =====================================================================
+# Quy tắc kiểm tra chất lượng dữ liệu — dùng chung cho pipeline (Tầng 3)
+# và dbt tests (Tầng 4). Mỗi vi phạm được ghi vào data/quality_log/
+# (sản phẩm nghiệm thu mốc M3, mục 3.2.3 báo cáo).
+# =====================================================================
+version: 1
+
+# Giá trị giữ chỗ / giá trị thiếu cần chuẩn hóa
+placeholder_values: ["<Other>", "(data deleted)", "(not set)", ""]
+null_like: [null, ""]
+
+# Phát hiện sự kiện trùng lặp
+duplicate_check:
+  # event_id = mã băm của các trường này (xem report/text/thiet-ke-mo-hinh-chieu.tex)
+  event_key_fields:
+    - user_pseudo_id
+    - event_timestamp
+    - event_name
+    - event_bundle_sequence_id
+
+# Xử lý bản ghi không hợp lệ
+invalid_records:
+  missing_session_id:
+    action: use_unknown_dimension        # dim "Không xác định", khóa -1
+  purchase_without_transaction_id:
+    action: drop_and_log
+  negative_or_zero_revenue:
+    action: drop_and_log
+
+# Nhật ký chất lượng dữ liệu
+quality_log:
+  path: data/quality_log/
+  fields: [run_date, rule_name, table, affected_rows, action]

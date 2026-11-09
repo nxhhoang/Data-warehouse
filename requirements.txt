@@ -1,0 +1,23 @@
+# Phụ thuộc Python — chốt phiên bản cụ thể ở Giai đoạn 1 (trước 30/10/2026)
+# Cài: pip install -r requirements.txt
+
+# Tầng 2 — Thu thập (Python Publisher)
+google-cloud-bigquery
+google-cloud-pubsub
+
+# Tầng 3 — Xử lý (Dataflow pipeline)
+apache-beam[gcp]
+
+# Tầng 4 — Kho dữ liệu (dbt)
+dbt-bigquery          # hoặc dbt-duckdb nếu chốt DuckDB làm kho
+
+# Phân tích & xử lý dữ liệu
+pandas
+pyyaml
+
+# Tầng 5 — Dashboard
+streamlit             # hoặc dùng Power BI (khi đó bỏ phần này)
+plotly
+
+# Kiểm thử
+pytest
