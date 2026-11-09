@@ -1,0 +1,359 @@
+\section{Bài toán nghiệp vụ và dữ liệu}
+\subsection{Tổng quan giải pháp}
+Để giải quyết vấn đề kinh doanh ở mục 2.3, nhóm đề xuất xây dựng một hệ thống hỗ trợ ra quyết định gồm bốn thành phần nối tiếp nhau:
+
+\begin{itemize}
+  \item \textbf{Tích hợp dữ liệu:} trích xuất dữ liệu sự kiện từ nguồn và đưa về một cấu trúc thống nhất.
+  \item \textbf{Kho dữ liệu:} lưu dữ liệu đã chuẩn hóa theo mô hình chiều (dimensional model) phục vụ phân tích theo thời gian, kênh truy cập, chiến dịch, thiết bị, khu vực địa lý và sản phẩm.
+  \item \textbf{Hệ thống chỉ số (KPI):} tính toán các chỉ số theo một bộ định nghĩa duy nhất, dùng chung cho mọi báo cáo.
+  \item \textbf{Ứng dụng hỗ trợ quyết định:} dashboard có bộ lọc, phân tích chi tiết, so sánh hiệu suất, cảnh báo theo ngưỡng và mô phỏng kịch bản.
+\end{itemize}
+
+Giải pháp hướng đến ba kết quả: (i) mọi con số trong báo cáo đều có thể truy vết được về dữ liệu gốc; (ii) các kênh và chiến dịch được so sánh trên cùng một định nghĩa chỉ số; (iii) người quản lý chuyển được từ quan sát sang hành động, chẳng hạn phát hiện kênh có chất lượng truy cập suy giảm, xác định bước khách hàng rời bỏ nhiều nhất trong phễu mua hàng, hoặc xác định kênh nào đáng ưu tiên đầu tư nội dung và nguồn lực. \medskip
+
+Do dữ liệu sử dụng không chứa chi phí quảng cáo, giải pháp đánh giá hiệu quả dựa trên chất lượng lưu lượng và kết quả kinh doanh (chuyển đổi, doanh thu, hành vi) thay vì chi phí.
+
+\subsection{Tập dữ liệu sử dụng}
+\subsubsection{Nguồn dữ liệu}
+
+Dự án sử dụng bộ dữ liệu công khai \texttt{ga4\_obfuscated\_sample\_ecommerce} thuộc chương trình BigQuery Public Datasets của Google. Bộ dữ liệu chứa mẫu dữ liệu sự kiện (event export) đã được làm mờ của Google Merchandise Store, một cửa hàng trực tuyến bán sản phẩm mang thương hiệu Google. Dữ liệu trải dài ba tháng, từ 01/11/2020 đến 31/01/2021. Website triển khai Google Analytics 4 theo chuẩn thương mại điện tử cùng cơ chế đo lường nâng cao (enhanced measurement). Dữ liệu được lưu trong các bảng sự kiện theo ngày.
+
+\subsubsection{Cấu trúc và nội dung}
+
+Mỗi dòng là một sự kiện của người dùng. Các nhóm thông tin chính gồm:
+
+\begin{table}[htbp]
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \caption{Cấu trúc và nội dung chính của tập dữ liệu}
+    \label{tab:dataset_structure}
+    \begin{tabular}{|p{2.8cm}|p{6.2cm}|p{5cm}|}
+        \hline
+        \textbf{Nhóm thông tin} &
+        \textbf{Trường tiêu biểu} &
+        \textbf{Mục đích phân tích} \\
+        \hline
+        Thời gian &
+        \texttt{event\_date}, \texttt{event\_timestamp} &
+        Xu hướng theo ngày, tuần, tháng \\
+        \hline
+        Người dùng và phiên &
+        \texttt{user\_pseudo\_id}, \texttt{ga\_session\_id} (trong \texttt{event\_params}) &
+        Đếm người dùng, phiên; phân tích hành vi theo phiên \\
+        \hline
+        Sự kiện &
+        \texttt{event\_name} (\texttt{page\_view}, \texttt{view\_item}, \texttt{add\_to\_cart}, \texttt{begin\_checkout}, \texttt{purchase}, ...) &
+        Xây dựng phễu chuyển đổi \\
+        \hline
+        Nguồn truy cập &
+        \texttt{traffic\_source.source}, \texttt{medium}, \texttt{name} &
+        So sánh kênh và chiến dịch \\
+        \hline
+        Thiết bị, địa lý &
+        \texttt{device}, \texttt{geo} &
+        Phân khúc khách hàng \\
+        \hline
+        Thương mại điện tử &
+        \texttt{ecommerce} (giá trị giao dịch, mã giao dịch), \texttt{items} &
+        Doanh thu, đơn hàng, sản phẩm \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{Đặc điểm và giới hạn}
+
+\begin{itemize}
+    \item \textbf{Dữ liệu đã bị làm mờ.} Một số trường chứa giá trị giữ chỗ như \texttt{<Other>}, \texttt{NULL} hoặc chuỗi rỗng, và tính nhất quán nội bộ có thể bị hạn chế. Đây là lý do quy trình ETL cần có bước kiểm tra, xử lý và ghi nhận chất lượng dữ liệu.
+
+    \item \textbf{Không có chi phí quảng cáo.} Bộ dữ liệu không chứa chi phí, lượt hiển thị hay lượt nhấp từ nền tảng quảng cáo, nên các chỉ số như CPA, ROAS, CPC không nằm trong phạm vi đồ án. Nhóm không tự tạo dữ liệu chi phí giả định, mà đánh giá hiệu quả kênh và chiến dịch bằng các chỉ số \textbf{không phụ thuộc chi phí}: lưu lượng, hành vi, tỷ lệ chuyển đổi, doanh thu và giá trị đơn hàng. Khi doanh nghiệp có dữ liệu chi phí thực, bảng chi phí có thể được bổ sung vào kho theo cùng chiều thời gian và chiều kênh/chiến dịch để mở rộng sang CPA, ROAS mà không phải thay đổi kiến trúc.
+
+    \item \textbf{Phạm vi thời gian ngắn.} Dữ liệu chỉ trải dài ba tháng, bao gồm mùa mua sắm cuối năm, nên các kết luận về xu hướng và tính mùa vụ cần được diễn giải thận trọng.
+
+    % \item \textbf{Không thể so sánh trực tiếp với tài khoản Google Analytics Demo.} Dữ liệu trong tập mẫu không thể so sánh trực tiếp với tài khoản Google Analytics Demo của cùng cửa hàng vì hai nguồn có dữ liệu khác nhau.
+\end{itemize}
+
+Tập dữ liệu được lựa chọn vì mô phỏng sát một doanh nghiệp thương mại điện tử có website, nhiều nguồn truy cập và luồng mua hàng đầy đủ, phù hợp với bối cảnh và đáp ứng yêu cầu dùng bộ dữ liệu công khai. Hệ thống được thiết kế để có thể mở rộng cho các nguồn khác như Google Ads, Meta Ads, TikTok Ads hoặc email marketing.
+
+\subsection{Kiến trúc hệ thống}
+
+Kiến trúc gồm năm tầng chính được tổ chức theo từng chức năng nhằm giảm sự phụ thuộc giữa quá trình thu thập dữ liệu, xử lý nghiệp vụ và khai thác dữ liệu:
+
+\begin{enumerate}
+    \item \textbf{Tầng nguồn dữ liệu:} Các bảng sự kiện theo ngày có tên dạng \texttt{events\_YYYYMMDD}. Mỗi bản ghi đại diện cho một sự kiện trên website như xem trang, xem sản phẩm, thêm sản phẩm vào giỏ hàng hoặc mua hàng. Hệ thống sử dụng cơ chế phát lại từng sự kiện để mô phỏng quá trình tiếp nhận dữ liệu trực tuyến.
+
+    \item \textbf{Tầng thu thập (Extract):} Python Publisher truy vấn dữ liệu từ BigQuery theo khoảng thời gian cấu hình, chuyển từng bản ghi thành thông điệp JSON và gửi đến Google Cloud Pub/Sub. Pub/Sub đóng vai trò trung gian giữa thành phần phát dữ liệu và thành phần xử lý, giúp tách biệt quá trình thu thập với xử lý dữ liệu. Các thông tin định danh và thời gian được duy trì để hỗ trợ truy vết, kiểm tra dữ liệu trùng lặp. Những thông điệp không thể xử lý được chuyển đến dead-letter topic để phục vụ kiểm tra và khắc phục lỗi.
+
+    \item \textbf{Tầng xử lý (Transform):} Tiếp nhận và xử lý các thông điệp từ Pub/Sub. Dataflow thực thi pipeline theo mô hình đọc, biến đổi và ghi dữ liệu, qua đó đưa các sự kiện từ định dạng thông điệp sang cấu trúc dữ liệu phù hợp để lưu trữ và phân tích.
+    \begin{itemize}
+        \item Giải mã thông điệp JSON và trích xuất các thuộc tính cần thiết từ dữ liệu sự kiện.
+        \item Chuẩn hóa kiểu dữ liệu, định dạng thời gian, giá trị thiếu và các giá trị giữ chỗ nhằm bảo đảm tính nhất quán giữa các bản ghi.
+        \item Trích xuất các thuộc tính từ \texttt{event\_params}, thông tin thiết bị, địa lý và thương mại điện tử. Đối với \texttt{items}, việc tách thành các bản ghi riêng được thực hiện để bảo toàn quan hệ giữa sự kiện và sản phẩm.
+        \item Kết hợp \texttt{user\_pseudo\_id} với \texttt{ga\_session\_id} được trích xuất từ \texttt{event\_params} để xây dựng định danh phiên. Định danh này cần được xử lý phù hợp với các trường hợp thiếu dữ liệu hoặc không thể xác định phiên.
+        \item Phát hiện bản ghi không hợp lệ, sự kiện trùng lặp và các giá trị không đáp ứng quy tắc nghiệp vụ. Các bản ghi bị loại hoặc cần xử lý bổ sung phải được ghi nhận để hỗ trợ truy vết và đánh giá chất lượng dữ liệu.
+        \item Các bản ghi sau xử lý được ghi vào bảng dữ liệu thô trong BigQuery. Những thông điệp không thể xử lý được chuyển sang luồng xử lý lỗi để tránh làm gián đoạn toàn bộ pipeline.
+    \end{itemize}
+
+    \item \textbf{Tầng kho dữ liệu (Load):} Google BigQuery được sử dụng làm nền tảng lưu trữ kho dữ liệu. dbt thực hiện biến đổi dữ liệu và xây dựng mô hình sao (Star Schema), trong đó các bảng dimension như thời gian, sự kiện, người dùng, thiết bị, địa lý, trang web, sản phẩm và nguồn truy cập liên kết với các bảng fact \texttt{fct\_events} và \texttt{fct\_purchase\_items}. Từ đó, hệ thống tạo các bảng tổng hợp như \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts} và \texttt{fct\_product\_performance} để phục vụ phân tích KPI và dashboard.
+
+    \item \textbf{Tầng phân tích và ứng dụng:} Xây dựng dashboard trực quan, khai thác dữ liệu từ các bảng tổng hợp trong BigQuery. Dashboard cung cấp các chỉ số như số lượng sự kiện, số người dùng, số phiên, giao dịch, doanh thu và hiệu suất sản phẩm. Người dùng có thể theo dõi xu hướng theo thời gian và so sánh kết quả giữa các nhóm thiết bị, khu vực địa lý hoặc nguồn truy cập. Những thông tin này tạo cơ sở cho việc đánh giá hoạt động và hỗ trợ ra quyết định dựa trên dữ liệu.
+\end{enumerate}
+
+Luồng dữ liệu:
+\[
+\text{Nguồn}
+\rightarrow \text{Trích xuất}
+\rightarrow \text{Biến đổi và kiểm tra chất lượng}
+\rightarrow \text{Kho dữ liệu}
+\rightarrow \text{Dashboard/DSS}.
+\]
+
+% Công nghệ dự kiến (nhóm chốt ở mục 4 và 5): Google BigQuery để truy xuất dữ liệu nguồn và lưu trữ kho dữ liệu; Python để trích xuất và phát lại dữ liệu; Google Cloud Pub/Sub để truyền nhận sự kiện; Google Cloud Dataflow kết hợp Apache Beam để xử lý dữ liệu theo luồng; dbt để biến đổi, chuẩn hóa dữ liệu và xây dựng mô hình kho dữ liệu; Streamlit để trực quan hóa KPI và phát triển dashboard hỗ trợ ra quyết định.
+
+\subsection{Hệ thống chỉ số (KPI)}
+
+Mỗi chỉ số được định nghĩa một lần, ghi rõ công thức, đơn vị và mức tổng hợp, để mọi báo cáo dùng chung.
+
+\subsection*{Nhóm A: Lưu lượng và mức độ tương tác}
+
+\begin{table}[htbp]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \caption{Các chỉ số về lưu lượng và mức độ tương tác}
+    \label{tab:traffic_kpi}
+    \begin{tabularx}{\textwidth}
+    {
+        >{\raggedright\arraybackslash}p{4.2cm}
+        >{\raggedright\arraybackslash}X
+    }
+        \hline
+        \textbf{Chỉ số} & \textbf{Định nghĩa} \\
+        \hline
+        Số người dùng &
+        Số \texttt{user\_pseudo\_id} phân biệt. \\
+
+        Số phiên &
+        Số cặp (\texttt{user\_pseudo\_id}, \texttt{ga\_session\_id}) phân biệt. \\
+
+        Số phiên/người dùng &
+        Số phiên / số người dùng. \\
+
+        Số lượt xem trang &
+        Số sự kiện \texttt{page\_view}. \\
+
+        Tỷ lệ phiên có tương tác &
+        Số phiên có tương tác (theo quy tắc GA4, ví dụ \texttt{session\_engaged}) / tổng số phiên. \\
+
+        Tỷ lệ người dùng mới &
+        Số người dùng có sự kiện \texttt{first\_visit} / số người dùng. \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection*{Nhóm B: Phễu chuyển đổi và hành vi mua hàng}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \caption{Các chỉ số về phễu chuyển đổi và hành vi mua hàng}
+    \label{tab:funnel_kpi}
+    \begin{tabularx}{\textwidth}{
+        >{\raggedright\arraybackslash}p{4.2cm}
+        >{\raggedright\arraybackslash}X
+    }
+        \hline
+        \textbf{Chỉ số} & \textbf{Định nghĩa} \\
+        \hline
+        Số lượt xem sản phẩm &
+        Số sự kiện \texttt{view\_item}. \\
+
+        Tỷ lệ thêm vào giỏ &
+        Số phiên có \texttt{add\_to\_cart} / số phiên có \texttt{view\_item}. \\
+
+        Tỷ lệ bắt đầu thanh toán &
+        Số phiên có \texttt{begin\_checkout} / số phiên có \texttt{add\_to\_cart}. \\
+
+        Tỷ lệ hoàn tất mua hàng &
+        Số phiên có \texttt{purchase} / số phiên có \texttt{begin\_checkout}. \\
+
+        Tỷ lệ rời bỏ giỏ hàng &
+        $1 - \dfrac{\text{số phiên có \texttt{purchase}}}
+        {\text{số phiên có \texttt{add\_to\_cart}}}$. \\
+
+        Tỷ lệ chuyển đổi theo từng bước phễu &
+        Số phiên đạt bước $k+1$ / số phiên đạt bước $k$. \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection*{Nhóm C: Chuyển đổi và doanh thu}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \caption{Các chỉ số về chuyển đổi và doanh thu}
+    \label{tab:revenue_kpi}
+    \begin{tabularx}{\textwidth}{
+        >{\raggedright\arraybackslash}p{4.2cm}
+        >{\raggedright\arraybackslash}X
+    }
+        \hline
+        \textbf{Chỉ số} & \textbf{Định nghĩa} \\
+        \hline
+        Số đơn hàng &
+        Số \texttt{transaction\_id} phân biệt trong sự kiện \texttt{purchase}. \\
+
+        Tỷ lệ chuyển đổi &
+        Số phiên có \texttt{purchase} / tổng số phiên. \\
+
+        Doanh thu &
+        Tổng giá trị giao dịch của sự kiện \texttt{purchase}. \\
+
+        Giá trị đơn trung bình (AOV) &
+        Doanh thu / số đơn hàng. \\
+
+        Doanh thu trên mỗi phiên &
+        Doanh thu / số phiên. \\
+
+        Doanh thu trên mỗi người dùng &
+        Doanh thu / số người dùng. \\
+
+        Tỷ trọng doanh thu theo kênh &
+        Doanh thu của kênh / tổng doanh thu. \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Chuyển đổi là sự kiện \texttt{purchase} được ghi nhận theo nguồn của phiên hoặc theo nguồn của người dùng nếu không xác định được nguồn phiên. Quy tắc này giải quyết rủi ro so sánh không đồng nhất nêu ở mục 2.1 và 2.2. Nhóm sẽ ghi rõ mô hình phân bổ được sử dụng.
+
+\subsection{Chức năng hỗ trợ ra quyết định}
+
+Ứng dụng dashboard gồm các chức năng sau:
+
+\begin{enumerate}
+    \item \textbf{Tổng quan điều hành:} Các KPI chính, xu hướng theo ngày/tuần/tháng, so sánh với kỳ trước.
+
+    \item \textbf{Bộ lọc đa chiều:} Theo khoảng thời gian, kênh, nguồn/chiến dịch, thiết bị, quốc gia/khu vực và nhóm sản phẩm.
+
+    \item \textbf{So sánh hiệu suất:} Đặt nhiều kênh, chiến dịch hoặc kỳ cạnh nhau trên cùng bộ chỉ số; xếp hạng theo doanh thu, tỷ lệ chuyển đổi và doanh thu trên mỗi phiên.
+
+    \item \textbf{Phân tích chất lượng kênh:} Đối chiếu quy mô lưu lượng với chất lượng lưu lượng (tương tác, chuyển đổi, doanh thu/phiên), giúp phân biệt kênh ``nhiều truy cập nhưng ít đơn'' với kênh ``ít truy cập nhưng chuyển đổi tốt''.
+
+    \item \textbf{Phân tích phễu chuyển đổi:} Từ xem sản phẩm đến mua hàng, chỉ ra bước có tỷ lệ rời bỏ cao nhất; có thể chia theo kênh, thiết bị hoặc nhóm sản phẩm.
+
+    \item \textbf{Phân tích chi tiết:} Từ kênh xuống chiến dịch, từ tháng xuống ngày, từ nhóm sản phẩm xuống sản phẩm.
+
+    \item \textbf{Phân khúc khách hàng:} Nhóm theo thiết bị, vùng, nguồn truy cập và hành vi (người dùng mới/quay lại, mức độ tương tác).
+
+    \item \textbf{Cảnh báo theo ngưỡng:} Đánh dấu kênh/chiến dịch có chỉ số bất thường (tỷ lệ chuyển đổi hoặc doanh thu, phiên giảm đáng kể so với trung bình kỳ trước, tỷ lệ rời bỏ giỏ hàng tăng, lưu lượng tăng đột biến nhưng chuyển đổi không tăng theo). Ngưỡng do người dùng cấu hình.
+
+    \item \textbf{Mô phỏng kịch bản:} Người dùng điều chỉnh giả định về lưu lượng của từng kênh hoặc tỷ lệ chuyển đổi rồi xem ước tính ảnh hưởng đến số đơn và doanh thu dựa trên hiệu suất lịch sử.
+
+    \item \textbf{Truy vết số liệu:} Từ một con số trên dashboard xem được công thức và các bản ghi nguồn tạo ra nó.
+\end{enumerate}
+
+\subsection{Ánh xạ giải pháp với vấn đề và người ra quyết định}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \caption{Ánh xạ giữa vấn đề kinh doanh, giải pháp và người ra quyết định}
+    \label{tab:solution_mapping}
+    \begin{tabularx}{\textwidth}{
+        >{\raggedright\arraybackslash}p{2.5cm}
+        >{\raggedright\arraybackslash}X
+        >{\centering\arraybackslash}p{1.8cm}
+        >{\raggedright\arraybackslash}p{3cm}
+    }
+        \hline
+        \textbf{Vấn đề} &
+        \textbf{Thành phần giải pháp} &
+        \textbf{Mức độ} &
+        \textbf{Người dùng chính} \\
+        \hline
+
+        1. Dữ liệu phân tán &
+        Kho dữ liệu tập trung và ETL chuẩn hóa &
+        Trọng tâm &
+        Tất cả \\
+
+        2. Khó đánh giá hiệu quả chiến dịch &
+        Hệ KPI thống nhất; so sánh hiệu suất; phân tích chất lượng kênh &
+        Trọng tâm &
+        CMO, Digital Marketing Manager \\
+
+        3. Khó phân tích hành vi, phễu &
+        Phân tích phễu theo phiên; drill-down &
+        Trọng tâm &
+        E-commerce \& Content Specialist \\
+
+        4. Khó phân khúc khách hàng &
+        Phân tích theo thiết bị, vùng, nguồn, hành vi &
+        Một phần &
+        CMO, E-commerce \& Content Specialist \\
+
+        5. Báo cáo chậm, thiếu nhất quán &
+        ETL tự động; dashboard có bộ lọc; định nghĩa KPI duy nhất &
+        Trọng tâm &
+        Digital Marketing Manager \\
+
+        6. Khó dự báo và phân bổ ngân sách &
+        Phân tích chất lượng kênh làm cơ sở ưu tiên nguồn lực; mô phỏng kịch bản theo lưu lượng và chuyển đổi &
+        Một phần &
+        CMO \\
+
+        \hline
+    \end{tabularx}
+\end{table}
+
+
+Vấn đề 1, 2, 3, 5 được giải quyết đầy đủ trên dữ liệu thật. Vấn đề 4 ở mức phân tích mô tả. Vấn đề 6 ở mức một phần: hệ thống cung cấp cơ sở về hiệu quả kênh và mô phỏng theo lưu lượng, chuyển đổi nhưng chưa đánh giá được hiệu quả theo chi phí do bộ dữ liệu không chứa chi phí quảng cáo. Điều này phù hợp với mục 2.2 rằng các chỉ số CPA, ROAS cần được xem cùng dữ liệu chi phí và biên lợi nhuận.
+
+\newpage
+\subsection{Phạm vi, giả định và giới hạn}
+
+\subsection*{Phạm vi.}
+
+Hệ thống xử lý dữ liệu theo lô (batch) trên bộ dữ liệu mẫu trong ba tháng, chưa triển khai thu thập thời gian thực và chưa kết nối trực tiếp với API của các nền tảng quảng cáo. Kiến trúc được thiết kế để có thể bổ sung nguồn mới (Google Ads, Meta Ads, TikTok Ads, email) và bảng chi phí thực bằng cách thêm bộ trích xuất và ánh xạ về cùng mô hình chiều.\\
+
+
+\subsection*{Giả định.}
+
+\begin{itemize}
+    \item Một phiên được xác định bởi cặp \texttt{user\_pseudo\_id} và \texttt{ga\_session\_id}; kênh của phiên được suy ra từ source/medium theo bộ quy tắc gom nhóm do nhóm định nghĩa và công bố.
+
+    \item Doanh thu lấy từ giá trị giao dịch trong dữ liệu; chưa có dữ liệu giá vốn nên chưa tính được lợi nhuận. Vì vậy, doanh thu cao chưa có nghĩa là lợi nhuận cao, đúng như lưu ý ở mục 1.1.
+\end{itemize}
+
+
+\subsection*{Giới hạn.}
+
+\begin{itemize}
+    \item Không có dữ liệu chi phí, hiển thị và lượt nhấp từ nền tảng quảng cáo nên không đánh giá được CPA, ROAS, CPC và hiệu quả đầu tư theo chi phí.
+
+    \item Do dữ liệu bị làm mờ, một số kết quả (như phân bổ nguồn, quy mô doanh thu) có thể lệch so với thực tế; nhóm ghi nhận tỷ lệ bản ghi bị ảnh hưởng.
+
+    \item Kết quả mô phỏng kịch bản dựa trên hiệu suất lịch sử và giả định quan hệ ổn định giữa lưu lượng, chuyển đổi và doanh thu, nên chỉ mang tính tham khảo.
+
+    \item Lợi ích kỳ vọng chưa được đo trên quy trình thực; nhóm đánh giá hệ thống qua kiểm thử tính đúng đắn của dữ liệu, tính nhất quán KPI, hiệu năng truy vấn và mức độ đáp ứng các câu hỏi nghiệp vụ.
+\end{itemize}
+
+
+% \subsection{Yêu cầu nghiệp vụ}
+
+% Hệ thống được xây dựng để đáp ứng bốn nhóm yêu cầu nghiệp vụ chính sau.
+
+% \subsubsection{Theo dõi hiệu quả chuyển đổi}
+
+% Quản lý và chuyên viên cần đánh giá đủ phễu mua hàng: số người dùng và số phiên đạt từng bước (xem sản phẩm, thêm giỏ, bắt đầu thanh toán, mua hàng, tùy chọn hai bước trung gian giao hàng và thanh toán), tỷ lệ chuyển tiếp giữa các bước và tỷ lệ chuyển đổi tổng thể. Các chỉ số này cần phân tích được theo ngày, tuần, thiết bị và khu vực, kèm so sánh với kỳ trước để phát hiện bước có tỷ lệ chuyển tiếp thấp hoặc suy giảm bất thường. Yêu cầu này giúp trả lời câu hỏi liệu hành trình mua hàng đang suy giảm tại đâu, và là cơ sở cho toàn bộ phần cảnh báo của hệ thống.
+
+% \subsubsection{So sánh hiệu quả theo nguồn truy cập}
+
+% Giám đốc Marketing và quản lý cần so sánh các nguồn truy cập theo hai tầng quy kết (cấp phiên và cấp người dùng): số người dùng, tỷ lệ chuyển đổi, số người mua hàng và giá trị mua hàng ghi nhận theo nguồn; phân biệt người dùng mới và quay lại dựa trên sự kiện \texttt{first\_visit}. Yêu cầu này giúp đánh giá kênh nào tạo ra hành vi chất lượng và kênh nào có lưu lượng lớn nhưng ít chuyển đổi. Ranh giới bắt buộc: bộ dữ liệu không chứa chi phí quảng cáo, do đó hệ thống không tính ROI/ROAS thực và không đưa ra kết luận về hiệu quả đầu tư quảng cáo; các tham số chi phí, nếu minh họa, chỉ xuất hiện ở chế độ giả định do người dùng nhập.
+
+% \subsubsection{Đánh giá hiệu quả sản phẩm và nội dung hiển thị}
+
+% Chuyên viên cần nhận diện sản phẩm và danh mục được quan tâm nhiều nhưng ít chuyển thành mua hàng: sản phẩm xem nhiều nhưng ít được thêm vào giỏ, sản phẩm thêm giỏ nhiều nhưng ít được mua; đóng góp giá trị mua hàng theo sản phẩm và theo hierarchy danh mục (ba cấp). Yêu cầu này hỗ trợ quyết định về nội dung trang sản phẩm, vị trí hiển thị và chương trình quảng bá, và sử dụng trực tiếp dữ liệu mặt hàng đã chuẩn hóa.
+
+% \subsubsection{Phân tích hành vi và hỗ trợ ưu tiên hành động}
+
+% Ba nhóm người ra quyết định đều cần hệ thống tổng hợp các tín hiệu nêu trên thành khuyến nghị có thứ tự ưu tiên: cảnh báo theo ngưỡng do người dùng cấu hình (ví dụ: tỷ lệ giỏ sang thanh toán giảm dưới ngưỡng, kèm bằng chứng số liệu và hành động đề xuất điều tra); phân cụm phiên theo đặc trưng hành vi để xác định nhóm có tiềm năng chuyển đổi; và mô phỏng giả định (what-if) ước lượng tác động của việc cải thiện một bước phễu lên lượng mua hàng. Yêu cầu này biến kho dữ liệu từ công cụ báo cáo thành công cụ hỗ trợ quyết định, và là tiêu chí đánh giá chính của thành phần ứng dụng theo đề cương môn học.

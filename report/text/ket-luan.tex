@@ -1,0 +1,10 @@
+\section{Kết luận}
+\label{sec:ketluan}
+
+Báo cáo giữa kỳ đã xác định bài toán nghiệp vụ và đề xuất hướng giải quyết cho việc đánh giá hiệu suất marketing số của doanh nghiệp thương mại điện tử quy mô nhỏ và vừa. Vấn đề cốt lõi là dữ liệu phân tán và định nghĩa chỉ số thiếu thống nhất. Điều này làm giảm khả năng so sánh hiệu quả giữa các kênh và chiến dịch, ảnh hưởng đến chất lượng quyết định của CMO, Digital Marketing Manager và E-commerce \& Content Specialist. \medskip
+
+Để giải quyết vấn đề này, nhóm đề xuất một hệ thống hỗ trợ ra quyết định gồm bốn thành phần: tích hợp dữ liệu, kho dữ liệu theo mô hình sao (\textit{Star Schema}), hệ thống KPI với định nghĩa duy nhất, và ứng dụng dashboard với mười chức năng hỗ trợ quyết định. Hệ thống sử dụng bộ dữ liệu công khai GA4 \texttt{ga4\_obfuscated\_sample\_ecommerce} (92 ngày) và được tổ chức theo kiến trúc năm tầng, từ nguồn dữ liệu, trích xuất, biến đổi và kiểm tra chất lượng, đến kho dữ liệu và tầng phân tích. Giải pháp xử lý trọng tâm các vấn đề 1, 2, 3 và 5, xử lý một phần các vấn đề 4 và 6. Do bộ dữ liệu không chứa chi phí quảng cáo, hệ thống đánh giá hiệu quả qua lưu lượng, hành vi, chuyển đổi và doanh thu, chưa bao gồm CPA, ROAS.  \medskip
+
+Hiện nhóm đã hoàn thành giai đoạn phân tích và thiết kế khái niệm. Phần việc còn lại được chia thành sáu giai đoạn với bảy mốc kiểm soát và tiêu chí nghiệm thu cụ thể, từ thiết kế chi tiết lược đồ, xây dựng ETL, nạp kho dữ liệu, cài đặt tầng KPI, phát triển dashboard, đến đánh giá hệ thống và nộp sản phẩm trước thời hạn. Các rủi ro chính, như chất lượng dữ liệu bị làm mờ, trễ tiến độ và hiệu năng truy vấn, đã được nhận diện cùng phương án xử lý.  \medskip
+
+Trong các giai đoạn tiếp theo, nhóm sẽ kiểm chứng thiết kế bằng dữ liệu thực, đánh giá hệ thống theo tính đúng đắn của dữ liệu, tính nhất quán KPI, hiệu năng truy vấn và mức độ đáp ứng câu hỏi nghiệp vụ. Kiến trúc cũng cho phép mở rộng bằng cách bổ sung dữ liệu chi phí và các nguồn như Google Ads, Meta Ads hoặc TikTok Ads mà không cần thay đổi mô hình chiều.  \medskip

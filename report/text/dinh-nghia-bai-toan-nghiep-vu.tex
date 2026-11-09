@@ -1,0 +1,60 @@
+\section{Định nghĩa bài toán nghiệp vụ}
+\subsection{Bối cảnh tổ chức}
+
+Tình huống sử dụng giả định là một doanh nghiệp bán lẻ hoặc thương mại điện tử quy mô nhỏ–vừa đang chạy các chiến dịch quảng cáo trên nhiều kênh. Bộ phận marketing quản lý nội dung và ngân sách chiến dịch; bộ phận bán hàng hoặc vận hành quản lý dữ liệu đơn hàng; bộ phận tài chính theo dõi chi phí và kết quả kinh doanh. Dữ liệu hiện được xuất riêng từ các nền tảng quảng cáo và lưu trong những tệp bảng tính hoặc hệ thống khác nhau.\medskip
+
+Trong bối cảnh này, doanh nghiệp cần thường xuyên trả lời các câu hỏi như chiến dịch nào tạo ra nhiều chuyển đổi, kênh nào có chi phí thu hút khách hàng thấp hơn, hiệu suất thay đổi ra sao theo tháng và có chiến dịch nào cần được rà soát. Vì các nguồn dữ liệu không cùng định dạng và có thể sử dụng định nghĩa chuyển
+đổi khác nhau, việc tổng hợp thông tin dễ mất thời gian và có rủi ro so sánh không đồng nhất.
+
+\subsection{Các vấn đề thường gặp}
+
+\begin{itemize}
+  \item \textbf{Vấn đề 1. Dữ liệu marketing phân tán và thiếu tính tích hợp}
+
+  Dữ liệu marketing được thu thập từ nhiều nguồn như nền tảng quảng cáo, công cụ phân tích website và hệ thống bán hàng, với định dạng và cách định nghĩa chỉ số khác nhau. Việc thiếu kho dữ liệu tập trung khiến doanh nghiệp phải tổng hợp, chuẩn hóa thủ công, làm tăng nguy cơ sai sót và thiếu nhất quán trong báo cáo.
+  \item \textbf{Vấn đề 2. Khó đánh giá hiệu quả chiến dịch một cách toàn diện}
+
+  Các chỉ số như lượt hiển thị, lượt nhấp và tương tác chưa đủ để phản ánh giá trị kinh doanh của chiến dịch. Việc đánh giá cần kết hợp chi phí quảng cáo, số chuyển đổi, doanh thu và các chỉ số phù hợp với mục tiêu chiến dịch. Sự khác biệt trong cách tính toán và phân bổ chuyển đổi giữa các nền tảng gây khó khăn khi so sánh hiệu quả giữa các chiến dịch và kênh marketing.
+  \item \textbf{Vấn đề 3. Khó phân tích hành vi và luồng tương tác của khách hàng}
+
+  Luồng tương tác của khách hàng bao gồm nhiều thao tác, từ truy cập website, xem sản phẩm đến thêm giỏ hàng và mua hàng. Khi các sự kiện chưa được liên kết và phân tích theo phiên truy cập, doanh nghiệp khó xác định các giai đoạn khách hàng rời bỏ, yếu tố thúc đẩy chuyển đổi và những điểm cần cải thiện trong quy trình mua hàng.
+  \item \textbf{Vấn đề 4. Khó phân khúc khách hàng và cá nhân hóa hoạt động marketing}
+
+  Sự khác biệt về đặc điểm và hành vi khiến mỗi nhóm khách hàng có nhu cầu tiếp cận khác nhau. Tuy nhiên, việc thiếu dữ liệu được tổ chức và phân tích hiệu quả gây khó khăn trong việc nhận diện các nhóm khách hàng, lựa chọn đối tượng mục tiêu và điều chỉnh nội dung marketing, từ đó hạn chế khả năng cá nhân hóa trải nghiệm.
+  \item \textbf{Vấn đề 5. Báo cáo chậm và thiếu tính nhất quán}
+
+  Việc tổng hợp và đối chiếu dữ liệu thủ công tiêu tốn thời gian, trong khi các phương pháp tính toán khác nhau có thể dẫn đến chênh lệch giữa các báo cáo. Thông tin cập nhật chậm khiến nhà quản lý khó theo dõi kịp thời biến động về chi phí, lưu lượng truy cập và tỷ lệ chuyển đổi, ảnh hưởng đến khả năng đưa ra quyết định.
+  \item \textbf{Vấn đề 6. Khó dự báo và phân bổ ngân sách marketing}
+
+  Ngân sách marketing có giới hạn, trong khi hiệu quả của các kênh và chiến dịch thay đổi theo thời gian và mục tiêu kinh doanh. Thiếu dữ liệu lịch sử nhất quán khiến nhà quản lý khó xác định mức độ ưu tiên đầu tư. Bên cạnh đó, các chỉ số như tỷ lệ chuyển đổi, doanh thu/phiên, giá trị đơn trung bình, phễu chuyển đổi, tỷ lệ rời bỏ cần được xem xét cùng mục tiêu chiến dịch, biên lợi nhuận và khả năng mở rộng để tránh đưa ra quyết định phân bổ ngân sách thiếu căn cứ.
+\end{itemize}
+
+
+\subsection{Phát biểu vấn đề kinh doanh}
+Doanh nghiệp thiếu một quy trình phân tích tích hợp, nhất quán và có thể lặp lại để đánh giá hiệu suất chiến dịch marketing số. Dữ liệu phân tán làm giảm khả năng so sánh chi phí, chuyển đổi và doanh thu giữa các chiến dịch, từ đó hạn chế chất lượng quyết định về tối ưu chiến dịch và phân bổ ngân sách.
+
+\subsection{Người ra quyết định}
+\begin{table}[htbp]
+    \centering
+    \caption{Các nhóm người ra quyết định chính của hệ thống}
+    \label{tab:decision_makers}
+    \begin{tabular}{|p{3.5cm}|p{3cm}|p{7cm}|}
+        \hline
+        \textbf{Nhóm người ra quyết định} &
+        \textbf{Vai trò} &
+        \textbf{Nhu cầu quyết định điển hình} \\
+        \hline
+        Giám đốc Marketing (CMO) &
+        Hoạch định chiến lược &
+        Đánh giá hiệu quả tổng thể của các kênh marketing, xác định nhóm sản phẩm hoặc kênh cần ưu tiên và định hướng phân bổ nguồn lực. \\
+        \hline
+        Quản lý Marketing số (Digital Marketing Manager) &
+        Quản lý và kiểm soát &
+        So sánh hiệu quả các nguồn truy cập và chiến dịch theo thời gian, phát hiện biến động bất thường và đề xuất điều chỉnh kế hoạch marketing. \\
+        \hline
+        Chuyên viên Thương mại điện tử và Nội dung (E-commerce \& Content Specialist) &
+        Theo dõi và tối ưu vận hành &
+        Theo dõi hành vi truy cập và phễu chuyển đổi, xác định các điểm rơi trong hành trình khách hàng, từ đó đề xuất cải thiện nội dung và cách hiển thị sản phẩm. \\
+        \hline
+    \end{tabular}
+\end{table}

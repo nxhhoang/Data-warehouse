@@ -1,0 +1,32 @@
+\section{Giới thiệu}
+\subsection{Bối cảnh}
+Trong môi trường kinh doanh hiện đại, Marketing số không chỉ là hoạt động quảng cáo, truyền thông hay bán hàng, mà còn là quá trình thu thập dữ liệu, phân tích hành vi khách hàng, đánh giá hiệu quả chiến dịch và phân bổ nguồn lực nhằm đạt được mục tiêu kinh doanh. Doanh nghiệp có thể sử dụng nhiều kênh như Google Ads, Meta/Facebook Ads, TikTok Ads, email marketing và các nền tảng quảng bá khác. Mỗi nền tảng tạo ra dữ liệu về chi phí quảng cáo, lượt hiển thị, lượt nhấp, chuyển đổi, tương tác và doanh thu được ghi nhận theo mô hình phân bổ của nền tảng.\medskip
+
+Thông tin này chỉ có ý nghĩa đầy đủ khi được đặt trong cùng một ngữ cảnh phân tích. Chẳng hạn, kênh có nhiều lượt nhấp chưa chắc tạo ra nhiều đơn hàng; chiến dịch có doanh thu được phân bổ cao chưa chắc có lợi nhuận cao; và việc so sánh chi phí giữa hai kênh có thể sai lệch nếu cách ghi nhận chuyển đổi không thống  nhất. Dữ liệu phân tán trên các giao diện, cơ sở dữ liệu và bảng tính khiến người quản lý khó có được góc nhìn tổng thể, nhất quán và kịp thời.\medskip
+
+Kho dữ liệu cung cấp nơi lưu trữ tập trung cho dữ liệu đã được tích hợp và tổ chức phục vụ phân tích. Kết hợp với phân tích dữ liệu, kho dữ liệu có thể biến dữ liệu vận hành thành các chỉ số, xu hướng và thông tin hỗ trợ quyết định.
+
+
+\subsection{Tổng quan dự án}
+Dự án đề xuất xây dựng Hệ thống hỗ trợ ra quyết định cho chiến dịch Marketing số. Hệ thống đưa tất cả dữ liệu về một cấu trúc thống nhất, kiểm tra chất lượng, lưu vào kho dữ liệu, tính toán KPI và hiển thị kết quả trên dashboard có bộ lọc cũng như hỗ trợ ra quyết định. Người dùng có thể đánh giá hiệu suất theo thời gian, chiến dịch và kênh, sau đó xác định chiến dịch nào cần được tiếp tục theo dõi, tối ưu hoặc xem xét lại ngân sách.\medskip
+
+Đối tượng triển khai ban đầu là doanh nghiệp quy mô nhỏ hoặc vừa có hoạt động quảng cáo đa kênh nhưng
+chưa có hệ thống phân tích tập trung. Để phù hợp điều kiện đồ án, dữ liệu có thể được nạp từ tệp CSV hoặc bộ
+dữ liệu công khai.
+
+\subsection{Mục tiêu dự án}
+
+\begin{itemize}
+  \item \textbf{Tích hợp và quản lý dữ liệu:} Xây dựng kho dữ liệu tập trung từ các nguồn dữ liệu marketing được lựa chọn, bảo đảm dữ liệu được tổ chức thống nhất và phục vụ hiệu quả cho nhu cầu phân tích.
+  \item \textbf{Thiết kế mô hình dữ liệu:} Xây dựng mô hình dữ liệu phù hợp, hỗ trợ phân tích hiệu suất marketing theo thời gian, kênh, chiến dịch và các khía cạnh kinh doanh liên quan.
+  \item \textbf{Xây dựng quy trình xử lý dữ liệu:} Phát triển quy trình ETL/ELT nhằm trích xuất, biến đổi, chuẩn hóa và nạp dữ liệu, đồng thời kiểm tra, xử lý và ghi nhận các vấn đề về chất lượng dữ liệu.
+  \item \textbf{Xây dựng hệ thống chỉ số marketing:} Xác định và triển khai các chỉ số đánh giá hiệu suất marketing theo những định nghĩa và quy tắc tính toán nhất quán, phục vụ việc theo dõi, so sánh và đánh giá kết quả hoạt động.
+  \item \textbf{Phát triển ứng dụng hỗ trợ quyết định:} Xây dựng ứng dụng dashboard trực quan, cung cấp chức năng lọc dữ liệu, phân tích chi tiết, so sánh hiệu suất, cảnh báo theo ngưỡng và mô phỏng các kịch bản nhằm hỗ trợ các cấp quản lý đưa ra quyết định.
+  \item \textbf{Đánh giá hệ thống:} Đánh giá tính đúng đắn của dữ liệu và các chỉ số, tính nhất quán giữa các thành phần, hiệu năng xử lý và truy vấn, cũng như mức độ hữu ích của hệ thống đối với các nhu cầu phân tích và ra quyết định kinh doanh.
+\end{itemize}
+
+\subsection{Lợi ích kỳ vọng}
+Nếu được triển khai phù hợp với dữ liệu và quy trình làm việc thực tế, hệ thống có thể giảm thao tác tổng hợp báo cáo thủ công, cải thiện khả năng truy vết số liệu, giúp phát hiện sớm các chiến dịch có dấu hiệu bất thường và tạo cơ sở so sánh nhất quán giữa các kênh. Đây là lợi ích kỳ vọng của thiết kế; mức độ cải thiện thực tế cần được đo bằng kiểm thử hoặc so sánh với quy trình hiện tại.
+
+\subsection{Cách tiếp cận thực hiện}
+Dự án thực hiện theo quy trình từ xác định nhu cầu quyết định đến xây dựng và đánh giá ứng dụng. Trước hết, nhóm xác định bối cảnh tổ chức, người dùng và câu hỏi kinh doanh. Tiếp theo, nhóm lựa chọn dữ liệu, thiết kế kho dữ liệu, xây dựng pipeline, triển khai các truy vấn phân tích và dashboard. Cuối cùng, nhóm kiểm thử đầu cuối, đánh giá kết quả, ghi nhận giới hạn và trình bày bản demo.
