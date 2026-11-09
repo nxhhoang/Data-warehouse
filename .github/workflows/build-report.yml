@@ -1,0 +1,73 @@
+name: Build LaTeX report
+
+# ==========================================================================
+# Workflow biên dịch báo cáo LaTeX (thư mục report/) thành PDF trên GitHub.
+# Các lệnh bên dưới đều được chú thích để dễ rà soát; workflow KHÔNG chạy cục bộ,
+# mọi cài đặt/biên dịch diễn ra trên hạ tầng GitHub Actions.
+# ==========================================================================
+
+# --- Kích hoạt (trigger) ------------------------------------------------
+# on.push   : tự động chạy khi push lên branch main/master, NHƯNG CHỈ khi
+#             có thay đổi trong report/ hoặc trong chính workflow này
+#             (giúp tiết kiệm phút CI khi sửa các file ngoài báo cáo).
+# on.pull_request: tương tự, chạy kiểm tra trên pull request.
+# on.workflow_dispatch: cho phép chạy thủ công từ tab Actions của GitHub.
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'report/**'
+      - '.github/workflows/build-report.yml'
+  pull_request:
+    paths:
+      - 'report/**'
+      - '.github/workflows/build-report.yml'
+  workflow_dispatch:
+
+# --- Hủy bản chạy cũ -----------------------------------------------------
+# concurrency: nếu push liên tiếp nhiều commit, chỉ giữ lần chạy mới nhất
+# của từng branch (github.ref) và hủy các lần đang chạy dở -- tránh tốn tài nguyên.
+concurrency:
+  group: report-latex-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Máy ảo Ubuntu miễn phí do GitHub cung cấp (ubuntu-latest = 24.04).
+    runs-on: ubuntu-latest
+
+    steps:
+      # Bước 1: tải mã nguồn repository về máy ảo ở thư mục $GITHUB_WORKSPACE.
+      # actions/checkout@v4 là phiên bản chính (major) hiện hành.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Bước 2: biên dịch LaTeX bằng Docker image TeXLive full.
+      # xu-cheng/latex-action@v3:
+      #   - chạy trong container texlive-full (chứa pdflatex, latexmk, biber,
+      #     vntex cho tiếng Việt, tikz, algorithm2e, glossaries-extra, ...);
+      #   - mặc định dùng latexmk với tham số:
+      #       -pdf                          -> xuất PDF (dùng pdflatex)
+      #       -file-line-error              -> lỗi hiển thị dạng file:dòng:cột
+      #       -interaction=nonstopmode      -> không dừng chờ gõ lệnh khi gặp lỗi
+      #       -halt-on-error                -> dừng ngay ở lỗi đầu tiên -> job fail
+      #   - latexmk tự chạy ĐỦ SỐ LẦN (rerun) cho mục lục, danh sách hình/bảng
+      #     hội tụ, và tự gọi BIBER vì main.tex dùng biblatex (\addbibresource);
+      #   - working_directory/report: mọi đường dẫn tương đối (text/, image/)
+      #     được resolve đúng như biên dịch cục bộ trong thư mục report/.
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v3
+        with:
+          working_directory: report   # thư mục chứa main.tex
+          root_file: main.tex          # file gốc cần biên dịch
+
+      # Bước 3: đăng ký file PDF kết quả như một artifact để tải về từ tab
+      # Actions. if-no-files-found: error -> nếu biên dịch không tạo được
+      # main.pdf thì job báo lỗi ngay (phát hiện sớm thất bại im lặng).
+      # Thời gian giữ artifact mặc định của repository (thường 90 ngày).
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-pdf            # tên artifact hiển thị trên GitHub
+          path: report/main.pdf       # file kết quả biên dịch
+          if-no-files-found: error
