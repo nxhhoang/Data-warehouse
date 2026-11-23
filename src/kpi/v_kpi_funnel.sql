@@ -14,13 +14,18 @@ SELECT
     SUM(f.sessions_with_view_item) AS sessions_with_view_item,
     SUM(f.sessions_with_add_to_cart) AS sessions_with_add_to_cart,
     SUM(f.sessions_with_begin_checkout) AS sessions_with_begin_checkout,
+    SUM(f.sessions_with_add_shipping_info) AS sessions_with_add_shipping_info,
+    SUM(f.sessions_with_add_payment_info) AS sessions_with_add_payment_info,
     SUM(f.sessions_with_purchase) AS sessions_with_purchase,
     SUM(f.sessions_cart_and_purchase) AS sessions_cart_and_purchase,
     SUM(f.sessions_checkout_and_purchase) AS sessions_checkout_and_purchase,
+    SUM(f.sessions_payment_and_purchase) AS sessions_payment_and_purchase,
     -- Funnel step transition rates (when aggregating across multiple days on the Dashboard, recalculate from numerators/denominators)
     SAFE_DIVIDE(SUM(f.sessions_with_add_to_cart), SUM(f.sessions_with_view_item)) AS add_to_cart_rate,
     SAFE_DIVIDE(SUM(f.sessions_with_begin_checkout), SUM(f.sessions_with_add_to_cart)) AS begin_checkout_rate,
-    SAFE_DIVIDE(SUM(f.sessions_checkout_and_purchase), SUM(f.sessions_with_begin_checkout)) AS purchase_completion_rate,
+    SAFE_DIVIDE(SUM(f.sessions_with_add_shipping_info), SUM(f.sessions_with_begin_checkout)) AS shipping_info_rate,
+    SAFE_DIVIDE(SUM(f.sessions_with_add_payment_info), SUM(f.sessions_with_add_shipping_info)) AS payment_info_rate,
+    SAFE_DIVIDE(SUM(f.sessions_payment_and_purchase), SUM(f.sessions_with_add_payment_info)) AS purchase_completion_rate,
     1 - SAFE_DIVIDE(SUM(f.sessions_cart_and_purchase), SUM(f.sessions_with_add_to_cart)) AS cart_abandonment_rate
 FROM `${PROJECT_ID}.marts.fct_daily_ecommerce` f
 JOIN `${PROJECT_ID}.core.dim_date` d ON f.date_key = d.date_key

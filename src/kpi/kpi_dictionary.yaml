@@ -1,16 +1,92 @@
+# KPI dictionary — the single source of truth for every KPI definition
+# (report section 3.4). One definition is written once here and reused by the
+# dashboard, the lineage service (src/kpi/lineage.py) and the docs.
+# Data values stay in Vietnamese because the dashboard renders them to users.
+
 kpis:
-  - id: conversion_rate
-    name: "Tỷ lệ chuyển đổi"
-    group: "C - Chuyển đổi và doanh thu"
-    unit: "%"
-    formula_text: "Số phiên có ít nhất một giao dịch hợp lệ / Tổng số phiên"
-    sql_formula: "SAFE_DIVIDE(SUM(sessions_with_purchase), SUM(total_sessions))"
-    mart_table: "marts.fct_daily_ecommerce"
-    core_tables: ["core.fct_sessions", "core.dim_date", "core.dim_traffic_source"]
+  # ============ Group A: Traffic and Engagement ============
+  - id: users
+    name: "Số người dùng"
+    group: "A - Lưu lượng và mức độ tương tác"
+    unit: "người dùng"
+    formula_text: "Số user_pseudo_id phân biệt"
+    sql_formula: "COUNT(DISTINCT user_key) trên core.fct_sessions"
+    mart_table: "core.fct_sessions (đếm trực tiếp)"
+    core_tables: ["core.fct_sessions", "core.dim_user", "core.dim_date"]
     raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
     caveats:
-      - "Chỉ tính giao dịch hợp lệ: transaction_id NOT NULL và ≠ '(not set)', purchase_revenue_in_usd > 0; trùng (user_pseudo_id, transaction_id) thì giữ event đầu tiên theo timestamp."
-      - "Khoảng 41% người dùng có nguồn ẩn danh (<Other> / (data deleted)), được gom vào nhóm 'Unknown'."
+      - "Đếm từ fct_sessions theo bộ lọc để tránh đếm trùng một người dùng dùng nhiều thiết bị trong cùng ngày."
+
+  - id: sessions
+    name: "Số phiên"
+    group: "A - Lưu lượng và mức độ tương tác"
+    unit: "phiên"
+    formula_text: "Số cặp (user_pseudo_id, ga_session_id) phân biệt"
+    sql_formula: "SUM(sessions)"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Khảo sát: 100% sự kiện có tham số ga_session_id; 845 phiên (0,23%) vắt qua hai ngày lịch và được gán theo ngày sự kiện đầu tiên."
+
+  - id: sessions_per_user
+    name: "Số phiên/người dùng"
+    group: "A - Lưu lượng và mức độ tương tác"
+    unit: "phiên/người dùng"
+    formula_text: "Số phiên / số người dùng"
+    sql_formula: "SAFE_DIVIDE(SUM(sessions), users)"
+    mart_table: "kpi.v_kpi_traffic_engagement"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  - id: page_views
+    name: "Số lượt xem trang"
+    group: "A - Lưu lượng và mức độ tương tác"
+    unit: "lượt"
+    formula_text: "Số sự kiện page_view"
+    sql_formula: "SUM(page_views)"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  - id: engagement_rate
+    name: "Tỷ lệ phiên có tương tác"
+    group: "A - Lưu lượng và mức độ tương tác"
+    unit: "%"
+    formula_text: "Số phiên có tương tác (theo quy tắc GA4) / tổng số phiên"
+    sql_formula: "SAFE_DIVIDE(SUM(engaged_sessions), SUM(sessions))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Phiên tương tác khi session_engaged = '1' hoặc engaged_session_event = 1 (tham số sự kiện theo chuẩn GA4)."
+
+  - id: new_user_rate
+    name: "Tỷ lệ người dùng mới"
+    group: "A - Lưu lượng và mức độ tương tác"
+    unit: "%"
+    formula_text: "Số người dùng có sự kiện first_visit / số người dùng"
+    sql_formula: "SAFE_DIVIDE(new_users, users)"
+    mart_table: "kpi.v_kpi_traffic_engagement"
+    core_tables: ["core.fct_sessions", "core.dim_user", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Khảo sát: 257.462/270.154 (95,3%) người dùng có first_visit."
+
+  # ============ Group B: Funnel and Purchasing Behavior ============
+  - id: view_item_events
+    name: "Số lượt xem sản phẩm"
+    group: "B - Phễu chuyển đổi và hành vi mua hàng"
+    unit: "lượt"
+    formula_text: "Số sự kiện view_item"
+    sql_formula: "SUM(view_item_events)"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Đếm theo sự kiện, khác với 'lượt xem mặt hàng' đếm trên dòng item sau UNNEST (khảo sát mục 10.2)."
 
   - id: add_to_cart_rate
     name: "Tỷ lệ thêm vào giỏ"
@@ -23,3 +99,144 @@ kpis:
     raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
     caveats:
       - "Sự kiện add_to_cart vắng mặt trong 18/92 ngày (cờ is_add_to_cart_tracked = FALSE); không nội suy trên biểu đồ ngày."
+
+  - id: begin_checkout_rate
+    name: "Tỷ lệ bắt đầu thanh toán"
+    group: "B - Phễu chuyển đổi và hành vi mua hàng"
+    unit: "%"
+    formula_text: "Số phiên có begin_checkout / Số phiên có add_to_cart"
+    sql_formula: "SAFE_DIVIDE(SUM(sessions_with_begin_checkout), SUM(sessions_with_add_to_cart))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Chịu ảnh hưởng của 18/92 ngày thiếu add_to_cart như add_to_cart_rate."
+
+  - id: shipping_info_rate
+    name: "Tỷ lệ điền thông tin giao hàng"
+    group: "B - Phễu chuyển đổi và hành vi mua hàng"
+    unit: "%"
+    formula_text: "Số phiên có add_shipping_info / Số phiên có begin_checkout"
+    sql_formula: "SAFE_DIVIDE(SUM(sessions_with_add_shipping_info), SUM(sessions_with_begin_checkout))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  - id: payment_info_rate
+    name: "Tỷ lệ điền thông tin thanh toán"
+    group: "B - Phễu chuyển đổi và hành vi mua hàng"
+    unit: "%"
+    formula_text: "Số phiên có add_payment_info / Số phiên có add_shipping_info"
+    sql_formula: "SAFE_DIVIDE(SUM(sessions_with_add_payment_info), SUM(sessions_with_add_shipping_info))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  - id: purchase_completion_rate
+    name: "Tỷ lệ hoàn tất mua hàng"
+    group: "B - Phễu chuyển đổi và hành vi mua hàng"
+    unit: "%"
+    formula_text: "Số phiên có giao dịch hợp lệ / Số phiên có add_payment_info"
+    sql_formula: "SAFE_DIVIDE(SUM(sessions_payment_and_purchase), SUM(sessions_with_add_payment_info))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Tử số dùng sessions_payment_and_purchase (phiên có cả add_payment_info và giao dịch hợp lệ)."
+
+  - id: cart_abandonment_rate
+    name: "Tỷ lệ rời bỏ giỏ hàng"
+    group: "B - Phễu chuyển đổi và hành vi mua hàng"
+    unit: "%"
+    formula_text: "1 - (Số phiên có giao dịch hợp lệ / Số phiên có add_to_cart)"
+    sql_formula: "1 - SAFE_DIVIDE(SUM(sessions_cart_and_purchase), SUM(sessions_with_add_to_cart))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  # ============ Group C: Conversion and Revenue ============
+  - id: orders
+    name: "Số đơn hàng"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "đơn"
+    formula_text: "Số transaction_id phân biệt trong các giao dịch hợp lệ"
+    sql_formula: "SUM(orders)"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Chỉ tính giao dịch hợp lệ; khảo sát ghi nhận 4.452 mã giao dịch phân biệt trên 5.692 sự kiện purchase."
+
+  - id: conversion_rate
+    name: "Tỷ lệ chuyển đổi"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "%"
+    formula_text: "Số phiên có ít nhất một giao dịch hợp lệ / Tổng số phiên"
+    sql_formula: "SAFE_DIVIDE(SUM(sessions_with_purchase), SUM(sessions))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date", "core.dim_traffic_source"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Chỉ tính giao dịch hợp lệ: transaction_id NOT NULL và không thuộc ('(not set)', '<Other>', '(data deleted)', ''), purchase_revenue_in_usd > 0; trùng (user_pseudo_id, transaction_id) thì giữ event đầu tiên theo timestamp."
+      - "Khoảng 41% người dùng có nguồn ẩn danh (<Other> / (data deleted)), được gom vào nhóm 'Unknown'."
+
+  - id: revenue_usd
+    name: "Doanh thu"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "USD"
+    formula_text: "Tổng purchase_revenue_in_usd của các giao dịch hợp lệ"
+    sql_formula: "SUM(revenue_usd)"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Chỉ tính giao dịch hợp lệ (xem conversion_rate); chưa trừ hoàn tiền, chưa có giá vốn nên chưa suy ra lợi nhuận."
+
+  - id: aov_usd
+    name: "Giá trị đơn trung bình (AOV)"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "USD/đơn"
+    formula_text: "Doanh thu / số đơn hàng"
+    sql_formula: "SAFE_DIVIDE(SUM(revenue_usd), SUM(orders))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  - id: revenue_per_session_usd
+    name: "Doanh thu trên mỗi phiên"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "USD/phiên"
+    formula_text: "Doanh thu / số phiên"
+    sql_formula: "SAFE_DIVIDE(SUM(revenue_usd), SUM(sessions))"
+    mart_table: "marts.fct_daily_ecommerce"
+    core_tables: ["core.fct_sessions", "core.dim_date"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats: []
+
+  - id: revenue_per_user_usd
+    name: "Doanh thu trên mỗi người dùng"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "USD/người dùng"
+    formula_text: "Doanh thu / số người dùng"
+    sql_formula: "SAFE_DIVIDE(revenue_usd, users)"
+    mart_table: "kpi.v_kpi_conversion_revenue"
+    core_tables: ["core.fct_sessions", "core.dim_date", "core.dim_traffic_source", "core.dim_device"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Số người dùng đếm từ fct_sessions theo cùng bộ lọc để tránh đếm trùng khi một người dùng dùng nhiều thiết bị."
+
+  - id: revenue_share_total
+    name: "Tỷ trọng doanh thu theo kênh"
+    group: "C - Chuyển đổi và doanh thu"
+    unit: "%"
+    formula_text: "Doanh thu của kênh / tổng doanh thu"
+    sql_formula: "SAFE_DIVIDE(revenue_usd, SUM(revenue_usd) OVER ())"
+    mart_table: "kpi.v_kpi_conversion_revenue"
+    core_tables: ["core.fct_sessions", "core.dim_date", "core.dim_traffic_source"]
+    raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
+    caveats:
+      - "Nhóm 'Unknown' (nguồn ẩn danh) chiếm tỷ trọng đáng kể do ~41% người dùng có nguồn bị làm mờ."
