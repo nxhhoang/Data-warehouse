@@ -417,8 +417,9 @@ def build_pipeline(argv):
                         help="JSONL file of events (local dry-run mode, replaces Pub/Sub)")
     parser.add_argument("--output_dir", default=None,
                         help="write JSONL outputs here instead of BigQuery (dry-run mode)")
-    parser.add_argument("--raw_dataset", required=True,
-                        help="BigQuery raw dataset (e.g. marketing_dss_raw)")
+    parser.add_argument("--raw_dataset", default="marketing_dss_raw",
+                        help="BigQuery raw dataset (e.g. marketing_dss_raw); "
+                             "ignored in dry-run mode")
     parser.add_argument("--bq_project", default=None,
                         help="project holding the raw dataset; defaults to --project")
     parser.add_argument("--dead_letter_table", default=None)
@@ -448,22 +449,28 @@ def build_pipeline(argv):
              if arg.startswith("--project=")),
             None,
         )
-    if bq_project is None:
-        raise SystemExit("Need --bq_project or --project=<gcp-project-id>")
 
-    dead_letter_table = known_args.dead_letter_table or \
-        f"{bq_project}:{known_args.raw_dataset}.dead_letter"
-    quality_log_table = known_args.quality_log_table or \
-        f"{bq_project}:{known_args.raw_dataset}.quality_log"
+    # BigQuery side is only wired up when not in dry-run mode; the dry-run
+    # writes local JSONL files and needs no project at all.
+    dead_letter_table = None
+    quality_log_table = None
+    write_options = None
+    raw_table_fn = None
+    if known_args.output_dir is None:
+        if bq_project is None:
+            raise SystemExit("Need --bq_project or --project=<gcp-project-id>")
+        dead_letter_table = known_args.dead_letter_table or \
+            f"{bq_project}:{known_args.raw_dataset}.dead_letter"
+        quality_log_table = known_args.quality_log_table or \
+            f"{bq_project}:{known_args.raw_dataset}.quality_log"
+        write_options = {
+            "method": beam.io.WriteToBigQuery.Method(known_args.write_method),
+        }
+        if known_args.write_method == "FILE_LOADS":
+            write_options["triggering_frequency"] = known_args.triggering_frequency
 
-    write_options = {
-        "method": beam.io.WriteToBigQuery.Method(known_args.write_method),
-    }
-    if known_args.write_method == "FILE_LOADS":
-        write_options["triggering_frequency"] = known_args.triggering_frequency
-
-    def raw_table_fn(event):
-        return f"{bq_project}:{known_args.raw_dataset}.events_{event['event_date']}"
+        def raw_table_fn(event):
+            return f"{bq_project}:{known_args.raw_dataset}.events_{event['event_date']}"
 
     def event_key(event):
         return json.dumps([event.get(field) for field in key_fields])
@@ -487,24 +494,28 @@ def build_pipeline(argv):
             NormalizeEventDoFn(placeholders)
         ).with_outputs(NormalizeEventDoFn.DEAD_TAG, main="valid")
 
-        normalized_valid = normalized.valid
+        valid_events = normalized.valid
         if known_args.input_file:
-            # Give dedup windows meaning in dry-run mode: stamp each event with
-            # its own event_timestamp (converted from microseconds to seconds)
-            # instead of the default processing-time timestamp.
-            normalized_valid = normalized_valid | "StampEventTime" >> beam.Map(
+            # Stamp AFTER normalization so event_timestamp is already an int;
+            # this gives the dedup windows real event-time meaning in dry-run
+            # mode instead of the default processing-time timestamp.
+            valid_events = valid_events | "StampEventTime" >> beam.Map(
                 lambda e: beam.window.TimestampedValue(e, e["event_timestamp"] / 1e6)
             )
 
-        classified = normalized_valid | "ClassifyQuality" >> beam.ParDo(
+        # Window every branch once, right before the stages that branch into
+        # side outputs, so the downstream Flattens always combine PCollections
+        # with the same windowing strategy (side outputs inherit it).
+        windowed_valid = valid_events | "WindowEvents" >> beam.WindowInto(
+            beam.window.FixedWindows(known_args.dedup_window_sec))
+
+        classified = windowed_valid | "ClassifyQuality" >> beam.ParDo(
             ClassifyQualityDoFn(purchase_rules)
         ).with_outputs(ClassifyQualityDoFn.QUALITY_TAG, main="valid")
 
         deduped = (
             classified.valid
             | "KeyByEventKey" >> beam.Map(lambda e: (event_key(e), e))
-            | "WindowForDedup" >> beam.WindowInto(
-                beam.window.FixedWindows(known_args.dedup_window_sec))
             | "GroupByKey" >> beam.GroupByKey()
             | "Dedupe" >> beam.ParDo(DedupeEventsDoFn()).with_outputs(
                 DedupeEventsDoFn.QUALITY_TAG, main="valid")
@@ -512,11 +523,13 @@ def build_pipeline(argv):
 
         dead_letter = (
             (parsed.dead_letter, normalized.dead_letter)
-            | beam.Flatten()
+            | "FlattenDeadLetter" >> beam.Flatten()
+            | "WindowDeadLetter" >> beam.WindowInto(
+                beam.window.FixedWindows(known_args.dedup_window_sec))
         )
         quality = (
             (classified.quality, deduped.quality)
-            | beam.Flatten()
+            | "FlattenQuality" >> beam.Flatten()
         )
 
         if known_args.output_dir:
