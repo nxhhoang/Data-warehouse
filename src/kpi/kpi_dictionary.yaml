@@ -9,7 +9,7 @@ kpis:
     core_tables: ["core.fct_sessions", "core.dim_date", "core.dim_traffic_source"]
     raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
     caveats:
-      - "Chỉ tính giao dịch hợp lệ (loại bỏ transaction_id = '(not set)' và trùng lặp)."
+      - "Chỉ tính giao dịch hợp lệ: transaction_id NOT NULL và ≠ '(not set)', purchase_revenue_in_usd > 0; trùng (user_pseudo_id, transaction_id) thì giữ event đầu tiên theo timestamp."
       - "Khoảng 41% người dùng có nguồn ẩn danh (<Other> / (data deleted)), được gom vào nhóm 'Unknown'."
 
   - id: add_to_cart_rate

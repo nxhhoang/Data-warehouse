@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: ga4_raw
+    description: "GA4 event data from BigQuery Public Dataset or raw tables ingested via Dataflow"
+    database: "{{ env_var('BQ_RAW_PROJECT', 'bigquery-public-data') }}"
+    schema: "{{ env_var('BQ_RAW_DATASET', 'ga4_obfuscated_sample_ecommerce') }}"
+    tables:
+      - name: events
+        identifier: "{{ env_var('BQ_RAW_TABLE', 'events_*') }}"

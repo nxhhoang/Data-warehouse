@@ -1,185 +1,121 @@
-{{
-    config(
-        materialized='table',
-        partition_by={
-            "field": "session_date",
-            "data_type": "date",
-            "granularity": "day"
-        },
-        cluster_by=["effective_traffic_source_key", "user_sk"]
-    )
-}}
-
-WITH session_events AS (
+WITH events_with_keys AS (
     SELECT
-        e.event_id,
         e.session_id,
-        e.ga_session_id,
-        e.user_sk,
-        e.traffic_source_key,
-        e.device_sk,
-        e.geo_sk,
-        e.page_sk,
+        e.user_pseudo_id,
         e.event_date,
-        e.event_ts,
+        e.date_key,
         e.event_timestamp,
         e.event_bundle_sequence_id,
-        e.is_engaged_session_event,
-        e.is_valid_purchase,
+        e.event_name,
+        e.engaged_session_event,
+        e.session_engaged,
         e.engagement_time_msec,
-        e.event_value_in_usd,
-        e.purchase_revenue_in_usd,
-        de.event_name,
-        ts.source AS event_source,
-        ts.medium AS event_medium
-    FROM {{ ref('fct_events') }} AS e
-    LEFT JOIN {{ ref('dim_event') }} AS de
-        ON e.event_key = de.event_key
-    LEFT JOIN {{ ref('dim_traffic_source') }} AS ts
-        ON e.traffic_source_key = ts.traffic_source_sk
-    WHERE e.session_id != -1
+        COALESCE(u.user_key, -1) AS user_key,
+        COALESCE(u.user_traffic_source_key, -1) AS user_source_key,
+        COALESCE(dev.device_key, -1) AS device_key,
+        COALESCE(geo.geo_key, -1) AS geo_key,
+        COALESCE(pg.page_key, -1) AS page_key,
+        -- Event-level source key (NULL if the event has no source/medium parameters)
+        CASE
+            WHEN e.ep_source IS NOT NULL OR e.ep_medium IS NOT NULL OR e.ep_campaign IS NOT NULL
+                THEN {{ gen_sk([
+                    "CASE WHEN e.ep_source IN ('<Other>', '(data deleted)', '(not set)', '') OR e.ep_source IS NULL THEN 'Unknown' ELSE TRIM(e.ep_source) END",
+                    "CASE WHEN e.ep_medium IN ('<Other>', '(data deleted)', '(not set)', '') OR e.ep_medium IS NULL THEN 'Unknown' ELSE TRIM(e.ep_medium) END",
+                    "CASE WHEN e.ep_campaign IN ('<Other>', '(data deleted)', '(not set)', '') OR e.ep_campaign IS NULL THEN 'Unknown' ELSE TRIM(e.ep_campaign) END"
+                ]) }}
+            ELSE NULL
+        END AS event_source_key
+    FROM {{ ref('stg_ga4_events') }} e
+    LEFT JOIN {{ ref('dim_user') }} u
+        ON e.user_pseudo_id = u.user_pseudo_id
+    LEFT JOIN {{ ref('dim_device') }} dev
+        ON {{ gen_sk([
+            "CASE WHEN e.device_category IN ('<Other>', '(data deleted)', '(not set)', '') OR e.device_category IS NULL THEN 'Unknown' ELSE TRIM(e.device_category) END",
+            "CASE WHEN e.operating_system IN ('<Other>', '(data deleted)', '(not set)', '') OR e.operating_system IS NULL THEN 'Unknown' ELSE TRIM(e.operating_system) END",
+            "CASE WHEN e.browser IN ('<Other>', '(data deleted)', '(not set)', '') OR e.browser IS NULL THEN 'Unknown' ELSE TRIM(e.browser) END",
+            "CASE WHEN e.language IN ('<Other>', '(data deleted)', '(not set)', '') OR e.language IS NULL THEN 'Unknown' ELSE TRIM(e.language) END"
+        ]) }} = dev.device_key
+    LEFT JOIN {{ ref('dim_geo') }} geo
+        ON {{ gen_sk([
+            "CASE WHEN e.continent IN ('<Other>', '(data deleted)', '(not set)', '') OR e.continent IS NULL THEN 'Unknown' ELSE TRIM(e.continent) END",
+            "CASE WHEN e.country IN ('<Other>', '(data deleted)', '(not set)', '') OR e.country IS NULL THEN 'Unknown' ELSE TRIM(e.country) END",
+            "CASE WHEN e.region IN ('<Other>', '(data deleted)', '(not set)', '') OR e.region IS NULL THEN 'Unknown' ELSE TRIM(e.region) END",
+            "CASE WHEN e.city IN ('<Other>', '(data deleted)', '(not set)', '') OR e.city IS NULL THEN 'Unknown' ELSE TRIM(e.city) END"
+        ]) }} = geo.geo_key
+    LEFT JOIN {{ ref('dim_page') }} pg
+        ON {{ gen_sk(["REGEXP_REPLACE(TRIM(e.page_location), r'[?#].*$', '')"]) }} = pg.page_key
+    WHERE e.session_id IS NOT NULL
 ),
-
-session_windowed AS (
+session_first_attrs AS (
     SELECT
-        *,
-
-        -- First valid non-'(not set)' traffic source within the session
-        FIRST_VALUE(
-            IF(
-                traffic_source_key != -1
-                AND (event_source != '(not set)' OR event_medium != '(not set)'),
-                traffic_source_key,
-                NULL
-            ) IGNORE NULLS
-        ) OVER (
-            PARTITION BY session_id
-            ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
-            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-        ) AS first_valid_session_source_key,
-
-        -- Initial device, geography, and landing/exit pages in chronological order
-        FIRST_VALUE(NULLIF(device_sk, -1) IGNORE NULLS) OVER (
-            PARTITION BY session_id
-            ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
-            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-        ) AS first_device_sk,
-
-        FIRST_VALUE(NULLIF(geo_sk, -1) IGNORE NULLS) OVER (
-            PARTITION BY session_id
-            ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
-            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-        ) AS first_geo_sk,
-
-        FIRST_VALUE(NULLIF(page_sk, -1) IGNORE NULLS) OVER (
-            PARTITION BY session_id
-            ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
-            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-        ) AS first_page_sk,
-
-        LAST_VALUE(NULLIF(page_sk, -1) IGNORE NULLS) OVER (
-            PARTITION BY session_id
-            ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
-            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-        ) AS last_page_sk
-
-    FROM session_events
-),
-
-session_aggregated AS (
-    SELECT
-        -- 1. Primary Key & Natural Session ID
         session_id,
-        ANY_VALUE(ga_session_id) AS ga_session_id,
-
-        -- 2. Anchor midnight-spanning sessions to the start date (MIN(event_date))
-        MIN(event_date) AS session_date,
-        COALESCE(CAST(FORMAT_DATE('%Y%m%d', MIN(event_date)) AS INT64), -1) AS date_key,
-
-        -- 3. Core Dimension Foreign Keys
-        COALESCE(ANY_VALUE(user_sk), -1) AS user_sk,
-        COALESCE(ANY_VALUE(first_valid_session_source_key), -1) AS session_source_key,
-        COALESCE(ANY_VALUE(first_device_sk), -1) AS device_sk,
-        COALESCE(ANY_VALUE(first_geo_sk), -1) AS geo_sk,
-        COALESCE(ANY_VALUE(first_page_sk), -1) AS landing_page_sk,
-        COALESCE(ANY_VALUE(last_page_sk), -1) AS exit_page_sk,
-
-        -- 4. Session Timestamps & Engagement Duration
-        MIN(event_ts) AS session_start_ts,
-        MAX(event_ts) AS session_end_ts,
-        TIMESTAMP_DIFF(MAX(event_ts), MIN(event_ts), SECOND) AS session_duration_sec,
-        SUM(engagement_time_msec) AS total_engagement_time_msec,
-
-        -- 5. Cumulative Funnel Flags (0/1)
-        MAX(CASE WHEN is_engaged_session_event THEN 1 ELSE 0 END) AS is_engaged,
+        -- Cross-midnight session rule (0.23%): take the date of the first event in the session
+        FIRST_VALUE(date_key) OVER w_asc AS date_key,
+        FIRST_VALUE(user_key) OVER w_asc AS user_key,
+        FIRST_VALUE(user_source_key) OVER w_asc AS user_source_key,
+        FIRST_VALUE(device_key) OVER w_asc AS device_key,
+        FIRST_VALUE(geo_key) OVER w_asc AS geo_key,
+        FIRST_VALUE(page_key) OVER w_asc AS landing_page_key,
+        FIRST_VALUE(event_source_key IGNORE NULLS) OVER (
+            PARTITION BY session_id
+            ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
+            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+        ) AS first_session_source_key
+    FROM events_with_keys
+    WINDOW w_asc AS (
+        PARTITION BY session_id
+        ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
+    )
+    QUALIFY ROW_NUMBER() OVER w_asc = 1
+),
+session_metrics AS (
+    SELECT
+        session_id,
+        COUNT(*) AS event_count,
+        COUNTIF(event_name = 'page_view') AS page_view_count,
+        COUNTIF(event_name = 'view_item') AS view_item_count,
+        SUM(engagement_time_msec) AS engagement_time_msec,
+        MAX(CASE WHEN session_engaged = '1' OR engaged_session_event = 1 THEN 1 ELSE 0 END) AS is_engaged,
         MAX(CASE WHEN event_name = 'view_item' THEN 1 ELSE 0 END) AS has_view_item,
         MAX(CASE WHEN event_name = 'add_to_cart' THEN 1 ELSE 0 END) AS has_add_to_cart,
-        MAX(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS has_begin_checkout,
-        MAX(CASE WHEN is_valid_purchase THEN 1 ELSE 0 END) AS has_purchase,
-
-        -- 6. Additive Session Volume & Revenue Measures
-        COUNT(*) AS event_count,
-        COUNTIF(event_name = 'page_view') AS pageview_count,
-        COUNTIF(is_valid_purchase) AS valid_order_count,
-        SUM(purchase_revenue_in_usd) AS purchase_revenue_in_usd,
-        SUM(event_value_in_usd) AS event_value_in_usd
-
-    FROM session_windowed
+        MAX(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS has_begin_checkout
+    FROM events_with_keys
     GROUP BY session_id
 ),
-
-final_sessions AS (
+session_orders AS (
     SELECT
-        sa.session_id,
-        sa.ga_session_id,
-        sa.session_date,
-        sa.date_key,
-        sa.user_sk,
-
-        -- Two-tier attribution keys (Role-playing with dim_traffic_source)
-        sa.session_source_key,
-
-        CASE
-            WHEN du.user_sk IS NULL OR du.user_sk = -1 THEN -1
-            ELSE {{ gen_sk(['du.first_source', 'du.first_medium', 'du.first_campaign']) }}
-        END AS user_source_key,
-
-        COALESCE(
-            NULLIF(sa.session_source_key, -1),
-            CASE
-                WHEN du.user_sk IS NULL OR du.user_sk = -1 THEN -1
-                ELSE {{ gen_sk(['du.first_source', 'du.first_medium', 'du.first_campaign']) }}
-            END,
-            -1
-        ) AS effective_traffic_source_key,
-
-        CASE
-            WHEN sa.session_source_key != -1 THEN 'session'
-            ELSE 'user_fallback'
-        END AS attribution_basis,
-
-        sa.device_sk,
-        sa.geo_sk,
-        sa.landing_page_sk,
-        sa.exit_page_sk,
-        sa.session_start_ts,
-        sa.session_end_ts,
-        sa.session_duration_sec,
-        sa.total_engagement_time_msec,
-        sa.is_engaged,
-        sa.has_view_item,
-        sa.has_add_to_cart,
-        sa.has_begin_checkout,
-        sa.has_purchase,
-        sa.event_count,
-        sa.pageview_count,
-        sa.valid_order_count,
-        sa.purchase_revenue_in_usd,
-        sa.event_value_in_usd
-
-    FROM session_aggregated AS sa
-    LEFT JOIN {{ ref('dim_user') }} AS du
-        ON sa.user_sk = du.user_sk
+        session_id,
+        COUNT(DISTINCT transaction_id) AS order_count,
+        SUM(revenue_usd) AS revenue_usd
+    FROM {{ ref('stg_valid_orders') }}
+    WHERE session_id IS NOT NULL
+    GROUP BY session_id
 )
-
-SELECT * FROM final_sessions
+SELECT
+    fa.session_id,
+    COALESCE(fa.date_key, -1) AS date_key,
+    COALESCE(fa.user_key, -1) AS user_key,
+    COALESCE(fa.device_key, -1) AS device_key,
+    COALESCE(fa.geo_key, -1) AS geo_key,
+    COALESCE(fa.landing_page_key, -1) AS landing_page_key,
+    -- 2-tier source attribution: prioritize session-level source, otherwise fallback to user-level source
+    COALESCE(fa.first_session_source_key, fa.user_source_key, -1) AS session_source_key,
+    COALESCE(fa.user_source_key, -1) AS user_source_key,
+    CASE
+        WHEN fa.first_session_source_key IS NOT NULL THEN 'session'
+        ELSE 'user_fallback'
+    END AS attribution_basis,
+    sm.event_count,
+    sm.page_view_count,
+    sm.view_item_count,
+    sm.engagement_time_msec,
+    sm.is_engaged,
+    sm.has_view_item,
+    sm.has_add_to_cart,
+    sm.has_begin_checkout,
+    CASE WHEN COALESCE(so.order_count, 0) > 0 THEN 1 ELSE 0 END AS has_purchase,
+    COALESCE(so.order_count, 0) AS order_count,
+    COALESCE(so.revenue_usd, 0.0) AS revenue_usd
+FROM session_first_attrs fa
+JOIN session_metrics sm ON fa.session_id = sm.session_id
+LEFT JOIN session_orders so ON fa.session_id = so.session_id

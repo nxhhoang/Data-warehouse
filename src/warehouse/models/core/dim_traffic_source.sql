@@ -1,72 +1,72 @@
-{{
-    config(
-        materialized='table'
-    )
-}}
-
-WITH raw_traffic AS (
-    -- 1. Event-level traffic attribution
-    SELECT
-        source,
-        medium,
-        campaign
+WITH raw_pairs AS (
+    -- Collect both event-level sources (used for sessions) and user-level sources (fallback)
+    SELECT DISTINCT
+        COALESCE(NULLIF(TRIM(ep_source), ''), 'Unknown') AS raw_source,
+        COALESCE(NULLIF(TRIM(ep_medium), ''), 'Unknown') AS raw_medium,
+        COALESCE(NULLIF(TRIM(ep_campaign), ''), 'Unknown') AS raw_campaign
     FROM {{ ref('stg_ga4_events') }}
+    WHERE ep_source IS NOT NULL OR ep_medium IS NOT NULL OR ep_campaign IS NOT NULL
 
     UNION DISTINCT
 
-    -- 2. User-level first-touch attribution (ensures full key coverage for dim_user & fallbacks)
-    SELECT
-        user_first_source AS source,
-        user_first_medium AS medium,
-        user_first_campaign AS campaign
+    SELECT DISTINCT
+        COALESCE(NULLIF(TRIM(user_raw_source), ''), 'Unknown') AS raw_source,
+        COALESCE(NULLIF(TRIM(user_raw_medium), ''), 'Unknown') AS raw_medium,
+        COALESCE(NULLIF(TRIM(user_raw_campaign), ''), 'Unknown') AS raw_campaign
     FROM {{ ref('stg_ga4_events') }}
 ),
-
-normalized_traffic AS (
+normalized AS (
     SELECT DISTINCT
         CASE
-            WHEN source IS NULL
-              OR TRIM(source) IN ('', '<Other>', '(data deleted)', '(not set)')
-            THEN '(not set)'
-            ELSE LOWER(TRIM(source))
+            WHEN raw_source IN ('<Other>', '(data deleted)', '(not set)', '') THEN 'Unknown'
+            ELSE raw_source
         END AS source,
-
         CASE
-            WHEN medium IS NULL
-              OR TRIM(medium) IN ('', '<Other>', '(data deleted)', '(not set)')
-            THEN '(not set)'
-            ELSE LOWER(TRIM(medium))
+            WHEN raw_medium IN ('<Other>', '(data deleted)', '(not set)', '') THEN 'Unknown'
+            ELSE raw_medium
         END AS medium,
-
         CASE
-            WHEN campaign IS NULL
-              OR TRIM(campaign) IN ('', '<Other>', '(data deleted)', '(not set)')
-            THEN '(not set)'
-            ELSE TRIM(campaign)
+            WHEN raw_campaign IN ('<Other>', '(data deleted)', '(not set)', '') THEN 'Unknown'
+            ELSE raw_campaign
         END AS campaign
-    FROM raw_traffic
+    FROM raw_pairs
 ),
-
-dim_traffic_source_base AS (
+classified AS (
     SELECT
-        {{ gen_sk(['source', 'medium', 'campaign']) }} AS traffic_source_sk,
+        {{ gen_sk(['source', 'medium', 'campaign']) }} AS traffic_source_key,
         source,
         medium,
         campaign,
-        {{ map_channel('source', 'medium') }} AS channel_group
-    FROM normalized_traffic
+        {{ map_channel('LOWER(TRIM(source))', 'LOWER(TRIM(medium))') }} AS channel_code
+    FROM normalized
+),
+base AS (
+    SELECT
+        traffic_source_key,
+        source,
+        medium,
+        campaign,
+        CASE channel_code
+            WHEN 'direct' THEN 'Direct'
+            WHEN 'organic_search' THEN 'Organic Search'
+            WHEN 'paid_search' THEN 'Paid Search'
+            WHEN 'display' THEN 'Display'
+            WHEN 'email' THEN 'Email'
+            WHEN 'affiliate' THEN 'Affiliate'
+            WHEN 'paid_social' THEN 'Paid Social'
+            WHEN 'social_organic' THEN 'Organic Social'
+            WHEN 'referral' THEN 'Referral'
+            ELSE 'Unknown'
+        END AS channel_group,
+        channel_code = 'unassigned' AS is_unassigned
+    FROM classified
 )
-
-SELECT * FROM dim_traffic_source_base
-
+SELECT * FROM base
 UNION ALL
-
-{{ unknown_member(
-    sk_col='traffic_source_sk',
-    columns=[
-        ('source', 'STRING'),
-        ('medium', 'STRING'),
-        ('campaign', 'STRING'),
-        ('channel_group', 'STRING')
-    ]
-) }}
+{{ unknown_member('traffic_source_key', [
+    ('source', 'STRING'),
+    ('medium', 'STRING'),
+    ('campaign', 'STRING'),
+    ('channel_group', 'STRING'),
+    ('is_unassigned', 'BOOL')
+]) }}
