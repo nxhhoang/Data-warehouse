@@ -260,11 +260,11 @@ Measure
 
 \texttt{dim\_traffic\_source}
 & (\texttt{source}, \texttt{medium}, \texttt{campaign})
-& Kênh đã gom nhóm theo bộ quy tắc của nhóm; nhóm ``Không xác định'' cho \texttt{<Other>} và \texttt{(data deleted)} \\
+& Kênh đã gom nhóm theo bộ quy tắc của nhóm; nhóm ``Unknown'' cho \texttt{<Other>} và \texttt{(data deleted)} \\
 
 \end{xltabular}
 
-Mỗi dimension dùng khóa thay thế (surrogate key) do dbt sinh ra, kèm một dòng ``Không xác định'' (khóa $-1$) để chứa giá trị thiếu hoặc bị ẩn danh. Do đó các khóa ngoại trong bảng fact không bao giờ NULL.
+Mỗi dimension dùng khóa thay thế (surrogate key) do dbt sinh ra, kèm một dòng ``Unknown'' (khóa $-1$) để chứa giá trị thiếu hoặc bị ẩn danh. Do đó các khóa ngoại trong bảng fact không bao giờ NULL.
 
 \subsection{Ma trận bus}
 

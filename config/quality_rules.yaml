@@ -21,7 +21,7 @@ duplicate_check:
 # Xử lý bản ghi không hợp lệ
 invalid_records:
   missing_session_id:
-    action: use_unknown_dimension        # dim "Không xác định", khóa -1
+    action: use_unknown_dimension        # dim "Unknown", khóa -1
   purchase_without_transaction_id:
     action: drop_and_log
   negative_or_zero_revenue:

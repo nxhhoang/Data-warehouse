@@ -5,7 +5,7 @@ SELECT
     ,
     {%- set t = col_type | upper -%}
     {%- if t == 'STRING' %}
-    CAST('Không xác định' AS STRING) AS {{ col_name }}
+    CAST('Unknown' AS STRING) AS {{ col_name }}
     {%- elif t in ['INT64', 'INT', 'INTEGER'] %}
     CAST(-1 AS INT64) AS {{ col_name }}
     {%- elif t in ['FLOAT64', 'FLOAT'] %}

@@ -10,7 +10,7 @@ kpis:
     raw_source: "bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*"
     caveats:
       - "Chỉ tính giao dịch hợp lệ (loại bỏ transaction_id = '(not set)' và trùng lặp)."
-      - "Khoảng 41% người dùng có nguồn ẩn danh (<Other> / (data deleted)), được gom vào nhóm 'Không xác định'."
+      - "Khoảng 41% người dùng có nguồn ẩn danh (<Other> / (data deleted)), được gom vào nhóm 'Unknown'."
 
   - id: add_to_cart_rate
     name: "Tỷ lệ thêm vào giỏ"

@@ -6,7 +6,7 @@
 # =====================================================================
 version: 1
 
-# Các giá trị coi như "Không xác định" (ghi vào dim "Không xác định", khóa -1)
+# Các giá trị coi như "Unknown" (ghi vào dim "Unknown", khóa -1)
 unassigned:
   sources: ["(direct)", "(not set)", "(none)", "<Other>", "(data deleted)"]
   mediums: ["(not set)", "(none)", "<Other>", "(data deleted)"]
