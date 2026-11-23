@@ -12,9 +12,12 @@ SELECT
     SUM(has_view_item) AS sessions_with_view_item,
     SUM(has_add_to_cart) AS sessions_with_add_to_cart,
     SUM(has_begin_checkout) AS sessions_with_begin_checkout,
+    SUM(has_add_shipping_info) AS sessions_with_add_shipping_info,
+    SUM(has_add_payment_info) AS sessions_with_add_payment_info,
     SUM(has_purchase) AS sessions_with_purchase,
     SUM(CASE WHEN has_add_to_cart = 1 AND has_purchase = 1 THEN 1 ELSE 0 END) AS sessions_cart_and_purchase,
     SUM(CASE WHEN has_begin_checkout = 1 AND has_purchase = 1 THEN 1 ELSE 0 END) AS sessions_checkout_and_purchase,
+    SUM(CASE WHEN has_add_payment_info = 1 AND has_purchase = 1 THEN 1 ELSE 0 END) AS sessions_payment_and_purchase,
     SUM(order_count) AS orders,
     SUM(revenue_usd) AS revenue_usd
 FROM {{ ref('fct_sessions') }}
