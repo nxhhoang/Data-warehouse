@@ -237,7 +237,7 @@ Các chỉ số mua hàng ở nhóm B và C chỉ tính trên \textbf{giao dịc
     \item Là sự kiện \texttt{purchase}.
     \item Có \texttt{transaction\_id} khác \texttt{NULL} và không thuộc các giá trị giữ chỗ \texttt{'(not set)'}, \texttt{'<Other>'}, \texttt{'(data deleted)'} hoặc chuỗi rỗng.
     \item Có doanh thu \texttt{purchase\_revenue\_in\_usd} lớn hơn 0.
-    \item Nếu một người dùng (\texttt{user\_pseudo\_id}) phát sinh nhiều sự kiện trùng \texttt{transaction\_id}, chỉ giữ lấy sự kiện có thuộc tính \texttt{event\_timestamp} sớm nhất.
+    \item Nếu một người dùng (\texttt{user\_pseudo\_id}) có phát sinh được nhiều sự kiện có trùng \texttt{transaction\_id}, chỉ giữ lấy sự kiện có thuộc tính \texttt{event\_timestamp} sớm nhất.
 \end{itemize}
 
 Định nghĩa này được cài đặt một lần duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và được mọi bảng fact, bảng tổng hợp và KPI kế thừa; các bản ghi bị loại theo từng điều kiện được ghi vào nhật ký chất lượng dữ liệu. \medskip
