@@ -1,8 +1,8 @@
 name: Build LaTeX slides
 
-# Kích hoạt khi:
-#  - push thay đổi trong thư mục slide/ hoặc chính workflow này
-#  - chạy thủ công từ tab Actions trên GitHub
+# Triggers:
+#  - push with changes under slide/ or this workflow itself
+#  - manual runs from the GitHub Actions tab
 on:
   push:
     branches: [main, master]
@@ -15,7 +15,7 @@ on:
       - '.github/workflows/build-slides.yml'
   workflow_dispatch:
 
-# Hủy job cũ đang chạy của cùng branch khi push mới
+# Cancel in-progress runs of the same branch on new pushes
 concurrency:
   group: latex-${{ github.ref }}
   cancel-in-progress: true
@@ -30,12 +30,12 @@ jobs:
       - name: Compile LaTeX document
         uses: xu-cheng/latex-action@v3
         with:
-          # Thư mục chứa main.tex
+          # Folder holding main.tex
           working_directory: slide
-          # File gốc cần biên dịch
+          # Root file to compile
           root_file: main.tex
-          # latexmk tự chạy đủ số pass để mục lục/TOC hội tụ
-          # args mặc định: -pdf -file-line-error -interaction=nonstopmode -halt-on-error
+          # latexmk reruns enough passes for the TOC to converge;
+          # default args: -pdf -file-line-error -interaction=nonstopmode -halt-on-error
 
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
