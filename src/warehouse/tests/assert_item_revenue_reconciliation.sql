@@ -1,7 +1,7 @@
 -- Reconcile item-level revenue (fct_purchase_items) against order-level revenue
--- (stg_valid_orders), as promised in report Section 4.5:
--- "Doanh thu cấp phiên (fct_sessions) và tổng item_revenue_usd (fct_purchase_items)
--- được đối chiếu bằng kiểm thử dbt; chênh lệch được ghi vào nhật ký chất lượng dữ liệu."
+-- (stg_valid_orders), as promised in report section 4.5: session-level revenue
+-- and total item_revenue_usd are reconciled with dbt tests, and any gap is
+-- recorded in the data quality log.
 -- Together with assert_revenue_reconciliation.sql (fct_sessions vs stg_valid_orders),
 -- this closes the chain: fct_sessions <-> stg_valid_orders <-> fct_purchase_items.
 --
