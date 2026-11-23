@@ -78,7 +78,9 @@ session_metrics AS (
         MAX(CASE WHEN session_engaged = '1' OR engaged_session_event = 1 THEN 1 ELSE 0 END) AS is_engaged,
         MAX(CASE WHEN event_name = 'view_item' THEN 1 ELSE 0 END) AS has_view_item,
         MAX(CASE WHEN event_name = 'add_to_cart' THEN 1 ELSE 0 END) AS has_add_to_cart,
-        MAX(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS has_begin_checkout
+        MAX(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS has_begin_checkout,
+        MAX(CASE WHEN event_name = 'add_shipping_info' THEN 1 ELSE 0 END) AS has_add_shipping_info,
+        MAX(CASE WHEN event_name = 'add_payment_info' THEN 1 ELSE 0 END) AS has_add_payment_info
     FROM events_with_keys
     GROUP BY session_id
 ),
@@ -113,6 +115,8 @@ SELECT
     sm.has_view_item,
     sm.has_add_to_cart,
     sm.has_begin_checkout,
+    sm.has_add_shipping_info,
+    sm.has_add_payment_info,
     CASE WHEN COALESCE(so.order_count, 0) > 0 THEN 1 ELSE 0 END AS has_purchase,
     COALESCE(so.order_count, 0) AS order_count,
     COALESCE(so.revenue_usd, 0.0) AS revenue_usd

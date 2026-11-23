@@ -25,7 +25,8 @@ base AS (
             WHEN 'purchase' THEN 6
             ELSE 0
         END AS funnel_step,
-        event_name IN ('view_item', 'add_to_cart', 'begin_checkout', 'purchase') AS is_funnel_event,
+        event_name IN ('view_item', 'add_to_cart', 'begin_checkout',
+                       'add_shipping_info', 'add_payment_info', 'purchase') AS is_funnel_event,
         event_name = 'purchase' AS is_conversion_event
     FROM distinct_events
 )
