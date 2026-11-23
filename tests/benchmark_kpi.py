@@ -12,17 +12,34 @@ def run_benchmark(project_id: str) -> list[dict]:
         {
             "name": "Q1_Overview_Daily_KPI_Raw",
             "layer": "Raw (events_*)",
+            # Same valid-order filters as stg_valid_orders.sql / assert_kpi_vs_raw_parity.sql:
+            # placeholder transaction_id excluded, revenue > 0, dedup keep earliest event.
             "sql": """
+                WITH valid_orders AS (
+                    SELECT
+                        user_pseudo_id,
+                        ecommerce.transaction_id AS transaction_id,
+                        ecommerce.purchase_revenue_in_usd AS revenue_usd
+                    FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+                    WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+                      AND event_name = 'purchase'
+                      AND ecommerce.transaction_id IS NOT NULL
+                      AND TRIM(ecommerce.transaction_id) NOT IN ('(not set)', '<Other>', '(data deleted)', '')
+                      AND ecommerce.purchase_revenue_in_usd > 0
+                    QUALIFY ROW_NUMBER() OVER (
+                        PARTITION BY user_pseudo_id, ecommerce.transaction_id
+                        ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
+                    ) = 1
+                )
                 SELECT
-                    event_date,
-                    COUNT(DISTINCT CONCAT(user_pseudo_id, '_',
-                        CAST((SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id' LIMIT 1) AS STRING)
+                    e.event_date,
+                    COUNT(DISTINCT CONCAT(e.user_pseudo_id, '_',
+                        CAST((SELECT value.int_value FROM UNNEST(e.event_params) WHERE key = 'ga_session_id' LIMIT 1) AS STRING)
                     )) AS sessions,
-                    SUM(CASE WHEN event_name = 'purchase' AND ecommerce.transaction_id IS NOT NULL
-                        AND ecommerce.transaction_id != '(not set)' THEN ecommerce.purchase_revenue_in_usd ELSE 0 END) AS revenue
-                FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+                    (SELECT SUM(revenue_usd) FROM valid_orders) AS revenue
+                FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` e
                 WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
-                GROUP BY event_date
+                GROUP BY e.event_date
             """,
         },
         {

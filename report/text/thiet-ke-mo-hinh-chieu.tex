@@ -47,6 +47,8 @@ Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bư�
 
 \end{xltabular}
 
+Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fct\_purchase\_items} và cờ \texttt{has\_purchase} của \texttt{fct\_sessions} được định nghĩa ở mục 3.4: là sự kiện \texttt{purchase} có \texttt{transaction\_id} khác rỗng và không thuộc giá trị giữ chỗ, có doanh thu lớn hơn 0, và sau khi khử trùng theo cặp (\texttt{user\_pseudo\_id}, \texttt{transaction\_id}) chỉ giữ sự kiện sớm nhất. Định nghĩa này được cài đặt duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và kế thừa xuống toàn bộ tầng lõi và tầng tổng hợp.
+
 
 
 
