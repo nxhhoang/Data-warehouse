@@ -47,7 +47,7 @@ Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bư�
 
 \end{xltabular}
 
-Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fct\_purchase\_items} và cờ \texttt{has\_purchase} của \texttt{fct\_sessions} được định nghĩa ở mục 3.4: là sự kiện \texttt{purchase} có \texttt{transaction\_id} khác rỗng và không thuộc giá trị giữ chỗ, có doanh thu lớn hơn 0, và sau khi khử trùng theo cặp (\texttt{user\_pseudo\_id}, \texttt{transaction\_id}) chỉ giữ sự kiện sớm nhất. Định nghĩa này được cài đặt duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và kế thừa xuống toàn bộ tầng lõi và tầng tổng hợp.
+Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fct\_purchase\_items} và cờ \texttt{has\_purchase} của \texttt{fct\_sessions} được định nghĩa ở mục 3.4: là sự kiện \texttt{purchase} có \texttt{transaction\_id} khác rỗng và không thuộc giá trị giữ chỗ, có doanh thu lớn hơn 0, và sau khi khử trùng theo cặp (\texttt{user\_pseudo\_id}, \texttt{transaction\_id}) chỉ giữ sự kiện sớm nhất. Định nghĩa này được cài đặt duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và kế thừa xuống toàn bộ tầng lõi và tầng tổng hợp. \medskip
 
 Phễu cấp phiên gồm sáu bước (\texttt{view\_item} $\rightarrow$ \texttt{add\_to\_cart} $\rightarrow$ \texttt{begin\_checkout} $\rightarrow$ \texttt{add\_shipping\_info} $\rightarrow$ \texttt{add\_payment\_info} $\rightarrow$ mua hàng), tương ứng \texttt{funnel\_step} 1--6 trong \texttt{dim\_event}; các cờ \texttt{has\_*} của \texttt{fct\_sessions} đánh dấu phiên đạt từng bước. Ở cấp mặt hàng, \texttt{fct\_item\_events} chỉ giữ bốn loại sự kiện \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart} và \texttt{begin\_checkout}, vì hai bước trung gian của quá trình thanh toán không phân tích theo sản phẩm.
 
@@ -56,7 +56,7 @@ Phễu cấp phiên gồm sáu bước (\texttt{view\_item} $\rightarrow$ \textt
 
 \subsection{Chi tiết bảng fact}
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
 \caption{Cấu trúc \texttt{fct\_events}}
 \label{tab:fct-events} \\
 
@@ -104,7 +104,7 @@ Phễu cấp phiên gồm sáu bước (\texttt{view\_item} $\rightarrow$ \textt
 
 \renewcommand{\arraystretch}{1.4}
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
 \caption{Cấu trúc \texttt{fct\_sessions}}
 \label{tab:fct-sessions} \\
 
@@ -154,7 +154,7 @@ Phễu cấp phiên gồm sáu bước (\texttt{view\_item} $\rightarrow$ \textt
 
 
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}X}
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
 \caption{Cấu trúc \texttt{fct\_purchase\_items} và \texttt{fct\_item\_events}}
 \label{tab:fct-purchase-item-events}
 

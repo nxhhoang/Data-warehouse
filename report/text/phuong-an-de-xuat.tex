@@ -87,7 +87,7 @@ Kiến trúc gồm năm tầng chính được tổ chức theo từng chức n�
     \begin{itemize}
         \item Giải mã thông điệp JSON và kiểm tra các trường bắt buộc (ngày, tên, thời điểm sự kiện); thông điệp không giải mã được hoặc sai cấu trúc được ghi vào bảng dead-letter kèm lý do, để tránh làm gián đoạn toàn bộ pipeline.
         \item Ép kiểu chuẩn cho dấu thời gian và các trường số, thay giá trị giữ chỗ (\texttt{<Other>}, \texttt{(data deleted)}, \texttt{(not set)}, chuỗi rỗng) bằng giá trị thiếu, và điền cấu trúc rỗng cho \texttt{event\_params}, \texttt{items}, \texttt{ecommerce} để mọi bản ghi có cùng hình dạng. Bản ghi được giữ nguyên cấu trúc lồng nhau của dữ liệu gốc.
-        \item Phát hiện sự kiện trùng lặp theo bộ trường định danh trong tệp cấu hình chất lượng (\texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name}, \texttt{event\_bundle\_sequence\_id}) trong từng cửa sổ thời gian; bản trùng bị loại và số dòng bị loại được ghi vào nhật ký chất lượng dữ liệu. Việc khử trùng toàn cục tiếp tục được bảo đảm ở tầng staging.
+        \item Hỗ trợ phát hiện các sự kiện trùng lặp dựa theo bộ trường định danh trong tệp cấu hình chất lượng (\texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name}, \texttt{event\_bundle\_sequence\_id}) trong từng cửa sổ thời gian; bản trùng bị loại và số dòng bị loại được ghi vào nhật ký chất lượng dữ liệu. Việc khử trùng toàn cục tiếp tục được bảo đảm ở tầng staging.
         \item Áp dụng bộ quy tắc chất lượng dùng chung với tầng kho: sự kiện \texttt{purchase} thiếu \texttt{transaction\_id} hoặc có doanh thu bằng không hoặc âm bị loại và ghi nhật ký; sự kiện thiếu định danh phiên được giữ lại và xử lý bằng dòng ``Unknown'' của dimension ở tầng sau.
         \item Ghi các bản ghi hợp lệ vào bảng thô \texttt{events\_YYYYMMDD}, phân mảnh theo ngày sự kiện, trong dataset thô của BigQuery.
         \item Việc làm phẳng \texttt{event\_params}, tách \texttt{items} thành từng dòng mặt hàng và ghép \texttt{user\_pseudo\_id} với \texttt{ga\_session\_id} thành định danh phiên được thực hiện ở tầng staging của dbt (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}). Nhờ tầng xử lý giữ nguyên cấu trúc gốc, kho dữ liệu chạy được trên cả dữ liệu công khai lẫn dữ liệu đã qua pipeline mà không phải sửa mô hình.
@@ -237,7 +237,7 @@ Các chỉ số mua hàng ở nhóm B và C chỉ tính trên \textbf{giao dịc
     \item Là sự kiện \texttt{purchase}.
     \item Có \texttt{transaction\_id} khác \texttt{NULL} và không thuộc các giá trị giữ chỗ \texttt{'(not set)'}, \texttt{'<Other>'}, \texttt{'(data deleted)'} hoặc chuỗi rỗng.
     \item Có doanh thu \texttt{purchase\_revenue\_in\_usd} lớn hơn 0.
-    \item Nếu một người dùng (\texttt{user\_pseudo\_id}) phát sinh nhiều sự kiện trùng \texttt{transaction\_id}, chỉ giữ sự kiện có \texttt{event\_timestamp} sớm nhất.
+    \item Nếu một người dùng (\texttt{user\_pseudo\_id}) phát sinh nhiều sự kiện trùng \texttt{transaction\_id}, chỉ giữ lấy sự kiện có thuộc tính \texttt{event\_timestamp} sớm nhất.
 \end{itemize}
 
 Định nghĩa này được cài đặt một lần duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và được mọi bảng fact, bảng tổng hợp và KPI kế thừa; các bản ghi bị loại theo từng điều kiện được ghi vào nhật ký chất lượng dữ liệu. \medskip
