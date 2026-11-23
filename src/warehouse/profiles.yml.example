@@ -1,0 +1,17 @@
+# dbt profile for BigQuery (report section 3.3, layer 4).
+# Copy to src/warehouse/profiles.yml and run dbt with --profiles-dir .
+# Authentication: run `gcloud auth application-default login` once.
+# The three warehouse schemas (staging, core, marts) are created exactly with
+# those names thanks to macros/generate_schema_name.sql; `dataset` below is
+# only a placeholder for models without a custom schema (currently none).
+marketing_dw:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: marketing_dss
+      threads: 4
+      timezone: UTC
+      location: US

@@ -1,11 +1,47 @@
+"""Query latency benchmark (milestone M5 acceptance, report section 4).
+
+Runs a fixed set of dashboard-style queries against the Raw layer
+(events_* tables) and against the Marts/KPI views, then reports latency,
+bytes scanned, and whether each Marts/KPI query meets the 3-second target.
+Results are saved to tests/benchmark_results.json.
+"""
+
 import os
 import time
 import json
 from pathlib import Path
 from google.cloud import bigquery
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_env_file(path: Path = REPO_ROOT / ".env") -> None:
+    """Load key/value pairs from a .env file if it exists; never overwrite."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
+
 
 def run_benchmark(project_id: str) -> list[dict]:
+    """Run all benchmark queries and collect timing results.
+
+    Parameters
+    ----------
+    project_id : str
+        GCP project that owns the kpi, marts and core datasets.
+
+    Returns
+    -------
+    list of dict
+        One entry per query with keys 'query_name', 'layer',
+        'latency_sec', 'bytes_processed', 'mb_processed' and 'status'
+        (PASS / FAIL for Marts/KPI queries under 3 s, BASELINE for raw).
+    """
     client = bigquery.Client(project=project_id)
 
     queries = [
@@ -132,6 +168,7 @@ def run_benchmark(project_id: str) -> list[dict]:
 
 
 if __name__ == "__main__":
+    load_env_file()
     PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "your-gcp-project-id")
     out = run_benchmark(PROJECT_ID)
     out_path = Path(__file__).resolve().parent / "benchmark_results.json"
