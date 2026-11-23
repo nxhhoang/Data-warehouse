@@ -3,7 +3,7 @@
 \section{Thiết kế mô hình chiều}
 \label{sec:dimensional-model}
 
-Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bước: chọn quy trình nghiệp vụ, khai báo grain, chọn dimension và xác định measure. Quy trình nghiệp vụ được chọn là \textbf{hành vi truy cập và mua hàng trên website thương mại điện tử}. Lược đồ gồm bốn bảng fact dùng chung tám bảng dimension (conformed dimensions), tạo thành nhiều lược đồ hình sao trên cùng một bus. Mọi bảng được dbt xây dựng trong vùng lõi của BigQuery.
+Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bước: chọn quy trình nghiệp vụ, khai báo grain, chọn dimension và xác định measure. Quy trình nghiệp vụ được chọn là \textbf{hành vi truy cập và mua hàng trên website thương mại điện tử}. Lược đồ gồm bốn bảng fact dùng chung tám bảng dimension (conformed dimensions), tạo thành nhiều lược đồ hình sao trên cùng một bus. dbt xây dựng bảng trong ba schema của BigQuery: staging (view), core (bảng fact và dimension) và marts (bảng tổng hợp).
 
 \subsection{Các bảng fact và grain}
 
@@ -49,6 +49,8 @@ Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bư�
 
 Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fct\_purchase\_items} và cờ \texttt{has\_purchase} của \texttt{fct\_sessions} được định nghĩa ở mục 3.4: là sự kiện \texttt{purchase} có \texttt{transaction\_id} khác rỗng và không thuộc giá trị giữ chỗ, có doanh thu lớn hơn 0, và sau khi khử trùng theo cặp (\texttt{user\_pseudo\_id}, \texttt{transaction\_id}) chỉ giữ sự kiện sớm nhất. Định nghĩa này được cài đặt duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và kế thừa xuống toàn bộ tầng lõi và tầng tổng hợp.
 
+Phễu cấp phiên gồm sáu bước (\texttt{view\_item} $\rightarrow$ \texttt{add\_to\_cart} $\rightarrow$ \texttt{begin\_checkout} $\rightarrow$ \texttt{add\_shipping\_info} $\rightarrow$ \texttt{add\_payment\_info} $\rightarrow$ mua hàng), tương ứng \texttt{funnel\_step} 1--6 trong \texttt{dim\_event}; các cờ \texttt{has\_*} của \texttt{fct\_sessions} đánh dấu phiên đạt từng bước. Ở cấp mặt hàng, \texttt{fct\_item\_events} chỉ giữ bốn loại sự kiện \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart} và \texttt{begin\_checkout}, vì hai bước trung gian của quá trình thanh toán không phân tích theo sản phẩm.
+
 
 
 
@@ -90,7 +92,7 @@ Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fc
 
 \texttt{page\_key} & FK $\rightarrow$ \texttt{dim\_page} & Trang phát sinh sự kiện \\
 
-\texttt{traffic\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp phiên của phiên chứa sự kiện \\
+\texttt{traffic\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp phiên của phiên chứa sự kiện; nếu phiên chưa từng có nguồn thì dùng nguồn cấp người dùng \\
 
 \texttt{session\_id} & Degenerate dimension & Nối sang \texttt{fct\_sessions} \\
 
@@ -144,7 +146,7 @@ Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fc
 
 \texttt{engagement\_time\_msec} & Measure (cộng được) & Tổng thời gian tương tác \\
 
-\texttt{is\_engaged}, \texttt{has\_view\_item}, \texttt{has\_add\_to\_cart}, \texttt{has\_begin\_checkout}, \texttt{has\_purchase} & Cờ 0/1 (cộng được) & Phiên có tương tác, đạt từng bước phễu; \texttt{has\_purchase} chỉ tính giao dịch hợp lệ \\
+\texttt{is\_engaged}, \texttt{has\_view\_item}, \texttt{has\_add\_to\_cart}, \texttt{has\_begin\_checkout}, \texttt{has\_add\_shipping\_info}, \texttt{has\_add\_payment\_info}, \texttt{has\_purchase} & Cờ 0/1 (cộng được) & Phiên có tương tác, đạt từng bước phễu sáu bước; \texttt{has\_purchase} chỉ tính giao dịch hợp lệ \\
 
 \texttt{order\_count}, \texttt{revenue\_usd} & Measure (cộng được) & Số đơn và doanh thu của giao dịch hợp lệ \\
 
@@ -234,15 +236,15 @@ Measure
 
 \texttt{dim\_date}
 & \texttt{event\_date}
-& Ngày, thứ, tuần, tháng, quý, cờ cuối tuần, cờ mùa mua sắm cuối năm, cờ \texttt{is\_add\_to\_cart\_tracked} \\
+& Ngày, thứ, tuần, tháng, quý, cờ cuối tuần, cờ mùa mua sắm cuối năm, cờ \texttt{is\_add\_to\_cart\_tracked} (đánh dấu 18/92 ngày không có sự kiện \texttt{add\_to\_cart}) \\
 
 \texttt{dim\_event}
 & \texttt{event\_name}
-& Nhóm sự kiện, thứ tự bước phễu, cờ thuộc phễu, cờ chuyển đổi \\
+& Nhóm sự kiện, thứ tự bước phễu (1--6), cờ thuộc phễu, cờ chuyển đổi \\
 
 \texttt{dim\_user}
 & \texttt{user\_pseudo\_id}
-& Ngày tiếp cận đầu tiên, cờ người dùng mới (\texttt{first\_visit}) \\
+& Ngày tiếp cận đầu tiên, cờ người dùng mới (\texttt{first\_visit}); nguồn cấp người dùng lấy tại sự kiện đầu tiên vì 15,64\% người dùng đổi nguồn trong kỳ \\
 
 \texttt{dim\_device}
 & Tổ hợp thuộc tính
