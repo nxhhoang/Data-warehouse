@@ -3,7 +3,21 @@ from pathlib import Path
 
 
 def format_condition(col_expr: str, values: list[str] | str) -> str:
-    """Convert configuration values into a SQL comparison expression (= or IN)."""
+    """Convert configuration values into a SQL comparison expression.
+
+    Parameters
+    ----------
+    col_expr : str
+        SQL expression compared against the values (e.g. a Jinja column ref).
+    values : list of str or str
+        One or more accepted values. A single value produces "=", multiple
+        values produce "IN (...)".
+
+    Returns
+    -------
+    str
+        SQL comparison expression such as "col = 'x'" or "col IN ('x', 'y')".
+    """
     if isinstance(values, str):
         return f"{col_expr} = '{values}'"
     if len(values) == 1:
@@ -13,7 +27,25 @@ def format_condition(col_expr: str, values: list[str] | str) -> str:
 
 
 def compile_macro(config_path: Path, output_path: Path) -> None:
-    """Read channel mapping rules from YAML and generate a dbt SQL macro."""
+    """Generate the map_channel dbt macro from the channel rules YAML.
+
+    Reads config/channels.yaml (the single source of truth for channel
+    grouping) and writes the ordered CASE expression to
+    src/warehouse/macros/map_channel.sql so every layer shares the same
+    mapping.
+
+    Parameters
+    ----------
+    config_path : Path
+        Path to config/channels.yaml.
+    output_path : Path
+        Path of the generated macro file; parent folders are created.
+
+    Raises
+    ------
+    ValueError
+        If a rule defines neither 'source' nor 'medium' conditions.
+    """
     with config_path.open("r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
