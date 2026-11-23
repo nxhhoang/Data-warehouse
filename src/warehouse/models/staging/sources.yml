@@ -5,6 +5,9 @@ sources:
     description: "GA4 event data from BigQuery Public Dataset or raw tables ingested via Dataflow"
     database: "{{ env_var('BQ_RAW_PROJECT', 'bigquery-public-data') }}"
     schema: "{{ env_var('BQ_RAW_DATASET', 'ga4_obfuscated_sample_ecommerce') }}"
+    # Wildcard table events_*: quoting is disabled so _TABLE_SUFFIX works in queries
+    quoting:
+      identifier: false
     tables:
       - name: events
         identifier: "{{ env_var('BQ_RAW_TABLE', 'events_*') }}"

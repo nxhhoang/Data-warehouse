@@ -30,7 +30,7 @@ Tài liệu được biên soạn từ hai nguồn:
 |---|---|
 | Sự kiện (event) | Một bản ghi logic trong bảng `events_YYYYMMDD`; các dòng vật lý phát sinh từ cấu trúc lặp (`event_params`, `items`) thuộc cùng một sự kiện |
 | Phiên (session) | Cặp (`user_pseudo_id`, `ga_session_id`), trong đó `ga_session_id` là tham số sự kiện |
-| Giao dịch hợp lệ | Một cặp (`user_pseudo_id`, `transaction_id`) với `transaction_id` khác NULL và khác `'(not set)'`; khi trùng, lấy sự kiện có `event_timestamp` nhỏ nhất |
+| Giao dịch hợp lệ | Sự kiện `purchase` có `transaction_id` khác NULL và không thuộc `('(not set)', '<Other>', '(data deleted)', '')`, có `purchase_revenue_in_usd` > 0; khi cặp (`user_pseudo_id`, `transaction_id`) trùng, lấy sự kiện có `event_timestamp` nhỏ nhất (định nghĩa chốt tại mục 3.4 của báo cáo) |
 | Nguồn cấp người dùng | Giá trị `traffic_source` tại sự kiện đầu tiên của một người dùng |
 | Nguồn cấp phiên | Giá trị tham số `source`/`medium` tại sự kiện đầu tiên của phiên có mang tham số này |
 | Người dùng | Định danh quan sát được `user_pseudo_id`; không tương ứng bắt buộc với một cá nhân ngoài đời thực |
@@ -225,7 +225,7 @@ Do một sự kiện view_item hoặc add_to_cart chứa nhiều dòng mặt hà
 | # | Nội dung | Kết quả | Quyết định |
 |---|---|---|---|
 | 1 | Độ phủ ngày | Đủ 92 ngày | Sử dụng toàn bộ giai đoạn dữ liệu |
-| 2 | Sự kiện phễu | Đủ bốn bước, có thể mở rộng sáu; `view_item_list` không sử dụng; `add_to_cart` thiếu 18/92 ngày | Phễu chính bốn bước; đánh dấu ngày thiếu trên biểu đồ theo ngày |
+| 2 | Sự kiện phễu | Đủ bốn bước, có thể mở rộng sáu; `view_item_list` không sử dụng; `add_to_cart` thiếu 18/92 ngày | Phễu sáu bước (thêm `add_shipping_info`, `add_payment_info`); đánh dấu ngày thiếu `add_to_cart` trên biểu đồ theo ngày |
 | 3 | Chất lượng purchase | Tồn tại trùng lặp và nhóm `(not set)` | Khử trùng lặp theo giao dịch hợp lệ; loại nhóm `(not set)` khỏi chỉ tiêu doanh thu |
 | 4 | Nguồn truy cập | Khoảng 59% người dùng có nguồn nhận diện được; ~41% ẩn danh | Duy trì bài toán nguồn; hai tầng quy kết; nhóm ẩn danh riêng |
 | 5 | Phiên | `ga_session_id` phủ 100% | Phiên = (`user_pseudo_id`, `ga_session_id`) |

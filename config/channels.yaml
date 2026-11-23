@@ -1,17 +1,17 @@
 # =====================================================================
-# Bộ quy tắc gom nhóm source/medium -> kênh
-# NGUỒN CHÂN LÝ DUY NHẤT: extract, pipeline, dbt và dashboard đều đọc
-# từ file này để tránh định nghĩa lệch nhau giữa các tầng.
-# Sản phẩm Giai đoạn 1 — chốt trước 30/10/2026 (mục 4.2 báo cáo).
+# source/medium -> channel grouping rules.
+# SINGLE SOURCE OF TRUTH: extract, pipeline, dbt and dashboard all read
+# from this file so the layers never drift apart.
+# Phase 1 deliverable — locked before 2026-10-30 (report section 4.2).
 # =====================================================================
 version: 1
 
-# Các giá trị coi như "Unknown" (ghi vào dim "Unknown", khóa -1)
+# Values treated as "Unknown" (stored in the "Unknown" dim member, key -1)
 unassigned:
   sources: ["(direct)", "(not set)", "(none)", "<Other>", "(data deleted)"]
   mediums: ["(not set)", "(none)", "<Other>", "(data deleted)"]
 
-# Quy tắc áp dụng THEO THỨ TỰ, khớp đầu tiên thắng
+# Rules are applied IN ORDER; the first match wins
 rules:
   - channel: direct
     source: ["(direct)"]
@@ -36,13 +36,13 @@ rules:
   - channel: paid_social
     medium: ["paid-social", "paidsocial"]
 
-  # TODO(G1): tách social_organic và referral theo danh sách source cụ thể
-  # sau khi khảo sát phân bố thực tế của bộ dữ liệu
+  # TODO(G1): split social_organic and referral by explicit source lists
+  # after surveying the actual distribution of the dataset
   - channel: social_organic
     medium: ["social", "social-network", "social-media"]
 
   - channel: referral
     medium: ["referral"]
 
-# Giá trị mặc định khi không khớp quy tắc nào
+# Default channel when no rule matches
 default_channel: unassigned
