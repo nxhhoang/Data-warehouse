@@ -34,6 +34,12 @@ def _render_headline(ctx: PageContext, current: dict) -> None:
             delta=fmt_delta(change), border=True,
             help=kpi.kpi_dictionary()[kpi_id]["formula_text"],
         )
+        # Feature 10: jump to the traceability page with this KPI selected
+        trace_page = ctx.pages.get("truy-vet")
+        if trace_page and col.button("Truy vết", key=f"ov_trace_{kpi_id}", type="tertiary",
+                                     icon=":material/manage_search:"):
+            st.session_state["trace_kpi"] = kpi_id
+            st.switch_page(trace_page)
     if has_previous:
         st.caption(f"So với kỳ trước: {prev_start:%d/%m/%Y} – {prev_end:%d/%m/%Y}")
     else:
@@ -58,7 +64,7 @@ def _render_trend(df) -> None:
     if _unit(kpi_id) == "%":
         fig.update_yaxes(tickformat=".1%")
     st.plotly_chart(style_figure(fig), width="stretch")
-    note = kpi.no_valid_order_note(df["session_date"].min(), df["session_date"].max())
+    note = kpi.data_gap_note(df["session_date"].min(), df["session_date"].max())
     if note and kpi_id in kpi.ORDER_KPIS:
         st.caption(note)
     if kpi_id in kpi.CART_DEPENDENT:

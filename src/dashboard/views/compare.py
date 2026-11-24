@@ -76,7 +76,7 @@ def _render_periods(ctx: PageContext) -> None:
     st.caption("Bộ lọc kênh, thiết bị, quốc gia, loại người dùng ở thanh bên áp dụng cho cả hai kỳ; "
                "khoảng thời gian ở thanh bên được thay bằng Kỳ A và Kỳ B.")
 
-    notes = {kpi.no_valid_order_note(*a), kpi.no_valid_order_note(*b)} - {None}
+    notes = {kpi.data_gap_note(*a), kpi.data_gap_note(*b)} - {None}
     for note in notes:
         st.warning(note, icon=":material/info:")
 

@@ -35,9 +35,11 @@ DIMENSIONS = {
     "Nguồn / Medium": "source_medium",
     "Chiến dịch": "campaign",
     "Thiết bị": "device_category",
+    "Châu lục": "continent",
     "Quốc gia": "country",
     "Loại trang vào": "landing_page_type",
     "Người dùng mới/cũ": "user_type",
+    "Mức tương tác": "engagement_level",
 }
 
 # Data window of the GA4 sample dataset (dbt vars start_date / end_date).

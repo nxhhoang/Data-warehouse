@@ -287,3 +287,4 @@ def test_fmt_delta():
     assert fmt_delta(0.125) == "+12,5%"
     assert fmt_delta(-0.05) == "-5,0%"
     assert fmt_delta(float("nan")) is None
+    assert fmt_delta(0.0001) is None

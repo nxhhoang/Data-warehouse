@@ -44,9 +44,17 @@ def fmt_value(value: float, unit: str) -> str:
 
 def fmt_delta(change: float) -> str | None:
     """Relative change for st.metric, or None when there is no comparison."""
-    if change is None or math.isnan(change):
+    # No arrow for "no change": a +0,0% in green reads as growth
+    if change is None or math.isnan(change) or abs(change) < 0.0005:
         return None
     return ("+" if change >= 0 else "") + _vn(change * 100, 1) + "%"
+
+
+def fmt_signed_usd(value: float) -> str:
+    """Signed USD amount; float noise under half a cent prints as $0,00 without a sign."""
+    if abs(value) < 0.005:
+        return fmt_value(0.0, "USD")
+    return ("+" if value > 0 else "−") + fmt_value(abs(value), "USD")
 
 
 def kpi_display_table(table, key_col: str, key_label: str, kpi_ids, extra=None):

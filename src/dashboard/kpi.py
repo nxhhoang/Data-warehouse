@@ -43,7 +43,7 @@ def _div(num: float, den: float) -> float:
     return float(num) / float(den) if den else np.nan
 
 
-def _totals(df: pd.DataFrame) -> dict[str, float]:
+def totals(df: pd.DataFrame) -> dict[str, float]:
     """Additive base measures of a frame of sessions."""
     return {
         "sessions": len(df),
@@ -75,7 +75,7 @@ def summarize(df: pd.DataFrame) -> dict[str, float]:
         are NaN. ``revenue_share_total`` is relative to ``df`` itself and is
         computed by :func:`breakdown` instead.
     """
-    t = _totals(df)
+    t = totals(df)
     return {
         "users": t["users"],
         "sessions": t["sessions"],
@@ -99,22 +99,28 @@ def summarize(df: pd.DataFrame) -> dict[str, float]:
     }
 
 
-# 01-10/11/2020: every purchase in the source has transaction_id '(not set)', so the
-# valid-order rule keeps no order on those days (883 such purchases over 92 days,
-# USD 31,817 of revenue excluded).
-NO_VALID_ORDER_DAYS = (pd.Timestamp("2020-11-01"), pd.Timestamp("2020-11-10"))
+# Date ranges where the source records (almost) no valid order, so orders and
+# revenue fall for data reasons rather than business ones. Counts from the raw
+# GA4 tables: 883 purchases over the 92 days have transaction_id '(not set)'
+# (USD 31,817 excluded by the valid-order rule).
+DATA_GAPS = (
+    (pd.Timestamp("2020-11-01"), pd.Timestamp("2020-11-10"),
+     "01–10/11/2020: mọi sự kiện purchase trong dữ liệu gốc có transaction_id '(not set)', nên "
+     "không có giao dịch hợp lệ; đơn hàng và doanh thu các ngày này bằng 0 do quy tắc lọc, không "
+     "phải do sụt giảm thật."),
+    (pd.Timestamp("2021-01-26"), pd.Timestamp("2021-01-31"),
+     "26–31/01/2021: dữ liệu gốc ngừng ghi nhận giao dịch bình thường (232/282 purchase không có "
+     "transaction_id, tổng doanh thu gốc 6 ngày chỉ 2.193 USD so với 3.000–6.700 USD/ngày trước "
+     "đó); mức giảm đơn hàng và doanh thu ở cuối kỳ là do dữ liệu, không phải do kinh doanh."),
+)
 ORDER_KPIS = ("orders", "conversion_rate", "revenue_usd", "aov_usd",
               "revenue_per_session_usd", "revenue_per_user_usd", "purchase_completion_rate")
 
 
-def no_valid_order_note(start: pd.Timestamp, end: pd.Timestamp) -> str | None:
-    """Warning text when [start, end] overlaps the days without valid orders."""
-    first, last = NO_VALID_ORDER_DAYS
-    if start > last or end < first:
-        return None
-    return ("01–10/11/2020: mọi sự kiện purchase trong dữ liệu gốc có transaction_id "
-            "'(not set)', nên không có giao dịch hợp lệ; đơn hàng và doanh thu các ngày "
-            "này bằng 0 do quy tắc lọc, không phải do sụt giảm thật.")
+def data_gap_note(start: pd.Timestamp, end: pd.Timestamp) -> str | None:
+    """Warning text for every data gap that [start, end] overlaps, or None."""
+    notes = [text for first, last, text in DATA_GAPS if not (start > last or end < first)]
+    return " ".join(notes) or None
 
 
 def time_series(df: pd.DataFrame, kpi_id: str, grain: str) -> pd.DataFrame:

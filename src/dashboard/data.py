@@ -171,7 +171,7 @@ def coerce(df: pd.DataFrame, schema: dict[str, str]) -> pd.DataFrame:
 
 
 # Columns added after loading, for grouping in the analysis pages
-DERIVED_SESSION_COLUMNS = ("source_medium", "user_type")
+DERIVED_SESSION_COLUMNS = ("source_medium", "user_type", "engagement_level")
 
 
 def derive_session_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -181,6 +181,9 @@ def derive_session_columns(df: pd.DataFrame) -> pd.DataFrame:
     out["user_type"] = pd.Series(
         np.where(out["is_new_user_session"] == 1, "Người dùng mới", "Người dùng cũ"),
         index=out.index, dtype="string")
+    from src.dashboard.analysis.segments import engagement_level
+
+    out["engagement_level"] = engagement_level(out["engagement_time_msec"])
     return out
 
 
@@ -192,6 +195,28 @@ def _query_bigquery(sql: str, project_id: str) -> pd.DataFrame:
 
     client = bigquery.Client(project=project_id)
     return client.query(sql.format(project=project_id)).to_dataframe()
+
+
+def run_query(settings: Settings, sql: str, params: list[tuple]) -> pd.DataFrame:
+    """Run a parameterised query on BigQuery (traceability checks).
+
+    Parameters
+    ----------
+    params : list of tuple
+        (name, BigQuery type, value); a list value becomes an ARRAY parameter.
+    """
+    if settings.data_source != "bigquery":
+        raise ValueError("run_query needs DASHBOARD_DATA_SOURCE=bigquery")
+    from google.cloud import bigquery
+
+    query_params = [
+        bigquery.ArrayQueryParameter(n, t, v) if isinstance(v, list)
+        else bigquery.ScalarQueryParameter(n, t, v)
+        for n, t, v in params
+    ]
+    client = bigquery.Client(project=settings.project_id)
+    job = client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=query_params))
+    return job.to_dataframe()
 
 
 def load_sessions(settings: Settings) -> pd.DataFrame:

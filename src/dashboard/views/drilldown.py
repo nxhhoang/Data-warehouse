@@ -114,7 +114,7 @@ def render(ctx: PageContext) -> None:
 
     if hier.source == "sessions":
         node = dd.subset(df, hier, path)  # dates of the node being viewed, not of the filter
-        note = kpi.no_valid_order_note(node["session_date"].min(), node["session_date"].max())
+        note = kpi.data_gap_note(node["session_date"].min(), node["session_date"].max())
         if note:
             st.caption(note)
     if hier.source == "products":

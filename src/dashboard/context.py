@@ -1,6 +1,6 @@
 """State handed by app.py to every page."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 
@@ -22,12 +22,15 @@ class PageContext:
         Date × product × channel × device frame, schema data.PRODUCT_COLUMNS.
     filters : Filters
         Filters chosen in the sidebar.
+    pages : dict
+        url_path -> st.Page, filled by app.py, for links between pages.
     """
 
     settings: Settings
     sessions: pd.DataFrame
     products: pd.DataFrame
     filters: Filters
+    pages: dict = field(default_factory=dict)
 
     @property
     def filtered(self) -> pd.DataFrame:
