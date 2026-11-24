@@ -1,23 +1,24 @@
-# Phụ thuộc Python — chốt phiên bản cụ thể ở Giai đoạn 1 (trước 30/10/2026)
-# Cài: pip install -r requirements.txt
+# Python dependencies — versions are pinned per layer before each milestone.
+# Install inside the project virtual environment (see docs/runbook.md):
+#   bash scripts/setup_venv.sh
 
-# Tầng 2 — Thu thập (Python Publisher)
+# Layer 2 — Extract (Python Publisher)
 google-cloud-bigquery
 google-cloud-pubsub
 
-# Tầng 3 — Xử lý (Dataflow pipeline)
+# Layer 3 — Transform (Dataflow pipeline)
 apache-beam[gcp]
 
-# Tầng 4 — Kho dữ liệu (dbt)
-dbt-bigquery          # hoặc dbt-duckdb nếu chốt DuckDB làm kho
+# Layer 4 — Data warehouse (dbt)
+dbt-bigquery          # or dbt-duckdb if DuckDB is chosen as the warehouse
 
-# Phân tích & xử lý dữ liệu
+# Analysis & data handling
 pandas
 pyyaml
 
-# Tầng 5 — Dashboard
-streamlit             # hoặc dùng Power BI (khi đó bỏ phần này)
+# Layer 5 — Dashboard
+streamlit             # or use Power BI (then drop this line)
 plotly
 
-# Kiểm thử
+# Testing
 pytest

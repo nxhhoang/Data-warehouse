@@ -1,0 +1,26 @@
+name: 'marketing_dw'
+version: '1.0.0'
+config-version: 2
+profile: 'marketing_dw'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+vars:
+  # Runs the full 92-day window by default; can be overridden when testing a 1-week range:
+  # dbt run --vars '{"start_date": "20201101", "end_date": "20201107"}'
+  start_date: '20201101'
+  end_date: '20210131'
+
+models:
+  marketing_dw:
+    staging:
+      +schema: staging
+      +materialized: view          # Saves storage within the 10 GiB Sandbox limit
+    core:
+      +schema: core
+      +materialized: table         # Pure CTAS, compatible with BigQuery Sandbox (DML prohibited)
+    marts:
+      +schema: marts
+      +materialized: table

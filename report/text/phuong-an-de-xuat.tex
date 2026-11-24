@@ -65,11 +65,11 @@ Mỗi dòng là một sự kiện của người dùng. Các nhóm thông tin ch
 \begin{itemize}
     \item \textbf{Dữ liệu đã bị làm mờ.} Một số trường chứa giá trị giữ chỗ như \texttt{<Other>}, \texttt{NULL} hoặc chuỗi rỗng, và tính nhất quán nội bộ có thể bị hạn chế. Đây là lý do quy trình ETL cần có bước kiểm tra, xử lý và ghi nhận chất lượng dữ liệu.
 
+    \item \textbf{Kết quả khảo sát chất lượng dữ liệu.} Khảo sát trên toàn bộ 92 ngày (22/10/2026, bộ truy vấn \texttt{survey/01}--\texttt{09}) ghi nhận: 100\% sự kiện có tham số \texttt{ga\_session\_id}; 845 phiên (0,23\%) phát sinh sự kiện trên hai ngày lịch, nên phiên được gán theo ngày sự kiện đầu tiên; 84,36\% người dùng có đúng một cặp source/medium trong toàn kỳ và 15,64\% đổi nguồn từ hai đến tám lần, nên nguồn cấp người dùng được khóa theo sự kiện đầu tiên; khoảng 41\% người dùng có nguồn ẩn danh do làm mờ dữ liệu. Trong 5.692 sự kiện \texttt{purchase}, 23 sự kiện thiếu \texttt{transaction\_id}, chỉ có 4.452 mã giao dịch phân biệt do trùng lặp, và \texttt{add\_to\_cart} vắng mặt trong 18/92 ngày. Các con số này là cơ sở cho quy tắc giao dịch hợp lệ ở mục 3.4 và cho nhật ký chất lượng dữ liệu.
+
     \item \textbf{Không có chi phí quảng cáo.} Bộ dữ liệu không chứa chi phí, lượt hiển thị hay lượt nhấp từ nền tảng quảng cáo, nên các chỉ số như CPA, ROAS, CPC không nằm trong phạm vi đồ án. Nhóm không tự tạo dữ liệu chi phí giả định, mà đánh giá hiệu quả kênh và chiến dịch bằng các chỉ số \textbf{không phụ thuộc chi phí}: lưu lượng, hành vi, tỷ lệ chuyển đổi, doanh thu và giá trị đơn hàng. Khi doanh nghiệp có dữ liệu chi phí thực, bảng chi phí có thể được bổ sung vào kho theo cùng chiều thời gian và chiều kênh/chiến dịch để mở rộng sang CPA, ROAS mà không phải thay đổi kiến trúc.
 
     \item \textbf{Phạm vi thời gian ngắn.} Dữ liệu chỉ trải dài ba tháng, bao gồm mùa mua sắm cuối năm, nên các kết luận về xu hướng và tính mùa vụ cần được diễn giải thận trọng.
-
-    % \item \textbf{Không thể so sánh trực tiếp với tài khoản Google Analytics Demo.} Dữ liệu trong tập mẫu không thể so sánh trực tiếp với tài khoản Google Analytics Demo của cùng cửa hàng vì hai nguồn có dữ liệu khác nhau.
 \end{itemize}
 
 Tập dữ liệu được lựa chọn vì mô phỏng sát một doanh nghiệp thương mại điện tử có website, nhiều nguồn truy cập và luồng mua hàng đầy đủ, phù hợp với bối cảnh và đáp ứng yêu cầu dùng bộ dữ liệu công khai. Hệ thống được thiết kế để có thể mở rộng cho các nguồn khác như Google Ads, Meta Ads, TikTok Ads hoặc email marketing.
@@ -85,15 +85,15 @@ Kiến trúc gồm năm tầng chính được tổ chức theo từng chức n�
 
     \item \textbf{Tầng xử lý (Transform):} Tiếp nhận và xử lý các thông điệp từ Pub/Sub. Dataflow thực thi pipeline theo mô hình đọc, biến đổi và ghi dữ liệu, qua đó đưa các sự kiện từ định dạng thông điệp sang cấu trúc dữ liệu phù hợp để lưu trữ và phân tích.
     \begin{itemize}
-        \item Giải mã thông điệp JSON và trích xuất các thuộc tính cần thiết từ dữ liệu sự kiện.
-        \item Chuẩn hóa kiểu dữ liệu, định dạng thời gian, giá trị thiếu và các giá trị giữ chỗ nhằm bảo đảm tính nhất quán giữa các bản ghi.
-        \item Trích xuất các thuộc tính từ \texttt{event\_params}, thông tin thiết bị, địa lý và thương mại điện tử. Đối với \texttt{items}, việc tách thành các bản ghi riêng được thực hiện để bảo toàn quan hệ giữa sự kiện và sản phẩm.
-        \item Kết hợp \texttt{user\_pseudo\_id} với \texttt{ga\_session\_id} được trích xuất từ \texttt{event\_params} để xây dựng định danh phiên. Định danh này cần được xử lý phù hợp với các trường hợp thiếu dữ liệu hoặc không thể xác định phiên.
-        \item Phát hiện bản ghi không hợp lệ, sự kiện trùng lặp và các giá trị không đáp ứng quy tắc nghiệp vụ. Các bản ghi bị loại hoặc cần xử lý bổ sung phải được ghi nhận để hỗ trợ truy vết và đánh giá chất lượng dữ liệu.
-        \item Các bản ghi sau xử lý được ghi vào bảng dữ liệu thô trong BigQuery. Những thông điệp không thể xử lý được chuyển sang luồng xử lý lỗi để tránh làm gián đoạn toàn bộ pipeline.
+        \item Giải mã thông điệp JSON và kiểm tra các trường bắt buộc (ngày, tên, thời điểm sự kiện); thông điệp không giải mã được hoặc sai cấu trúc được ghi vào bảng dead-letter kèm lý do, để tránh làm gián đoạn toàn bộ pipeline.
+        \item Ép kiểu chuẩn cho dấu thời gian và các trường số, thay giá trị giữ chỗ (\texttt{<Other>}, \texttt{(data deleted)}, \texttt{(not set)}, chuỗi rỗng) bằng giá trị thiếu, và điền cấu trúc rỗng cho \texttt{event\_params}, \texttt{items}, \texttt{ecommerce} để mọi bản ghi có cùng hình dạng. Bản ghi được giữ nguyên cấu trúc lồng nhau của dữ liệu gốc.
+        \item Hỗ trợ phát hiện các sự kiện trùng lặp dựa theo bộ trường định danh trong tệp cấu hình chất lượng (\texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name}, \texttt{event\_bundle\_sequence\_id}) trong từng cửa sổ thời gian; bản trùng bị loại và số dòng bị loại được ghi vào nhật ký chất lượng dữ liệu. Việc khử trùng toàn cục tiếp tục được bảo đảm ở tầng staging.
+        \item Áp dụng bộ quy tắc chất lượng dùng chung với tầng kho: sự kiện \texttt{purchase} thiếu \texttt{transaction\_id} hoặc có doanh thu bằng không hoặc âm bị loại và ghi nhật ký; sự kiện thiếu định danh phiên được giữ lại và xử lý bằng dòng ``Unknown'' của dimension ở tầng sau.
+        \item Ghi các bản ghi hợp lệ vào bảng thô \texttt{events\_YYYYMMDD}, phân mảnh theo ngày sự kiện, trong dataset thô của BigQuery.
+        \item Việc làm phẳng \texttt{event\_params}, tách \texttt{items} thành từng dòng mặt hàng và ghép \texttt{user\_pseudo\_id} với \texttt{ga\_session\_id} thành định danh phiên được thực hiện ở tầng staging của dbt (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}). Nhờ tầng xử lý giữ nguyên cấu trúc gốc, kho dữ liệu chạy được trên cả dữ liệu công khai lẫn dữ liệu đã qua pipeline mà không phải sửa mô hình.
     \end{itemize}
 
-    \item \textbf{Tầng kho dữ liệu (Load):} Google BigQuery được sử dụng làm nền tảng lưu trữ kho dữ liệu. dbt thực hiện biến đổi dữ liệu và xây dựng mô hình sao (Star Schema), trong đó các bảng dimension như thời gian, sự kiện, người dùng, thiết bị, địa lý, trang web, sản phẩm và nguồn truy cập liên kết với các bảng fact \texttt{fct\_events} và \texttt{fct\_purchase\_items}. Từ đó, hệ thống tạo các bảng tổng hợp như \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts} và \texttt{fct\_product\_performance} để phục vụ phân tích KPI và dashboard.
+    \item \textbf{Tầng kho dữ liệu (Load):} Google BigQuery được sử dụng làm nền tảng lưu trữ kho dữ liệu. dbt đọc bảng thô \texttt{events\_*} do Dataflow ghi (hoặc trỏ thẳng sang dataset công khai qua biến cấu hình), thực hiện biến đổi dữ liệu và xây dựng mô hình sao (Star Schema), trong đó các bảng dimension như thời gian, sự kiện, người dùng, thiết bị, địa lý, trang web, sản phẩm và nguồn truy cập liên kết với bốn bảng fact \texttt{fct\_events}, \texttt{fct\_sessions}, \texttt{fct\_purchase\_items} và \texttt{fct\_item\_events}. Từ đó, hệ thống tạo các bảng tổng hợp như \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts} và \texttt{fct\_product\_performance} để phục vụ phân tích KPI và dashboard.
 
     \item \textbf{Tầng phân tích và ứng dụng:} Xây dựng dashboard trực quan, khai thác dữ liệu từ các bảng tổng hợp trong BigQuery. Dashboard cung cấp các chỉ số như số lượng sự kiện, số người dùng, số phiên, giao dịch, doanh thu và hiệu suất sản phẩm. Người dùng có thể theo dõi xu hướng theo thời gian và so sánh kết quả giữa các nhóm thiết bị, khu vực địa lý hoặc nguồn truy cập. Những thông tin này tạo cơ sở cho việc đánh giá hoạt động và hỗ trợ ra quyết định dựa trên dữ liệu.
 \end{enumerate}
@@ -107,15 +107,13 @@ Luồng dữ liệu:
 \rightarrow \text{Dashboard/DSS}.
 \]
 
-% Công nghệ dự kiến (nhóm chốt ở mục 4 và 5): Google BigQuery để truy xuất dữ liệu nguồn và lưu trữ kho dữ liệu; Python để trích xuất và phát lại dữ liệu; Google Cloud Pub/Sub để truyền nhận sự kiện; Google Cloud Dataflow kết hợp Apache Beam để xử lý dữ liệu theo luồng; dbt để biến đổi, chuẩn hóa dữ liệu và xây dựng mô hình kho dữ liệu; Streamlit để trực quan hóa KPI và phát triển dashboard hỗ trợ ra quyết định.
-
 \subsection{Hệ thống chỉ số (KPI)}
 
 Mỗi chỉ số được định nghĩa một lần, ghi rõ công thức, đơn vị và mức tổng hợp, để mọi báo cáo dùng chung.
 
 \subsection*{Nhóm A: Lưu lượng và mức độ tương tác}
 
-\begin{table}[htbp]
+\begin{table}[H]
     \centering
     \renewcommand{\arraystretch}{1.2}
     \caption{Các chỉ số về lưu lượng và mức độ tương tác}
@@ -172,11 +170,17 @@ Mỗi chỉ số được định nghĩa một lần, ghi rõ công thức, đơ
         Tỷ lệ bắt đầu thanh toán &
         Số phiên có \texttt{begin\_checkout} / số phiên có \texttt{add\_to\_cart}. \\
 
+        Tỷ lệ điền thông tin giao hàng &
+        Số phiên có \texttt{add\_shipping\_info} / số phiên có \texttt{begin\_checkout}. \\
+
+        Tỷ lệ điền thông tin thanh toán &
+        Số phiên có \texttt{add\_payment\_info} / số phiên có \texttt{add\_shipping\_info}. \\
+
         Tỷ lệ hoàn tất mua hàng &
-        Số phiên có \texttt{purchase} / số phiên có \texttt{begin\_checkout}. \\
+        Số phiên có giao dịch hợp lệ / số phiên có \texttt{add\_payment\_info}. \\
 
         Tỷ lệ rời bỏ giỏ hàng &
-        $1 - \dfrac{\text{số phiên có \texttt{purchase}}}
+        $1 - \dfrac{\text{số phiên có giao dịch hợp lệ}}
         {\text{số phiên có \texttt{add\_to\_cart}}}$. \\
 
         Tỷ lệ chuyển đổi theo từng bước phễu &
@@ -184,6 +188,8 @@ Mỗi chỉ số được định nghĩa một lần, ghi rõ công thức, đơ
         \hline
     \end{tabularx}
 \end{table}
+
+Phễu chuyển đổi gồm sáu bước: \texttt{view\_item} $\rightarrow$ \texttt{add\_to\_cart} $\rightarrow$ \texttt{begin\_checkout} $\rightarrow$ \texttt{add\_shipping\_info} $\rightarrow$ \texttt{add\_payment\_info} $\rightarrow$ mua hàng. Khảo sát dữ liệu xác nhận cả sáu bước đều có mặt trong 92 ngày; riêng \texttt{add\_to\_cart} vắng mặt trong 18/92 ngày nên biểu đồ theo ngày không nội suy cho các ngày thiếu và đánh dấu bằng cờ \texttt{is\_add\_to\_cart\_tracked} trong \texttt{dim\_date}.
 
 \subsection*{Nhóm C: Chuyển đổi và doanh thu}
 
@@ -200,13 +206,13 @@ Mỗi chỉ số được định nghĩa một lần, ghi rõ công thức, đơ
         \textbf{Chỉ số} & \textbf{Định nghĩa} \\
         \hline
         Số đơn hàng &
-        Số \texttt{transaction\_id} phân biệt trong sự kiện \texttt{purchase}. \\
+        Số \texttt{transaction\_id} phân biệt trong các giao dịch hợp lệ. \\
 
         Tỷ lệ chuyển đổi &
-        Số phiên có \texttt{purchase} / tổng số phiên. \\
+        Số phiên có ít nhất một giao dịch hợp lệ / tổng số phiên. \\
 
         Doanh thu &
-        Tổng giá trị giao dịch của sự kiện \texttt{purchase}. \\
+        Tổng \texttt{purchase\_revenue\_in\_usd} của các giao dịch hợp lệ. \\
 
         Giá trị đơn trung bình (AOV) &
         Doanh thu / số đơn hàng. \\
@@ -222,6 +228,19 @@ Mỗi chỉ số được định nghĩa một lần, ghi rõ công thức, đơ
         \hline
     \end{tabularx}
 \end{table}
+
+\subsection*{Định nghĩa giao dịch hợp lệ}
+
+Các chỉ số mua hàng ở nhóm B và C chỉ tính trên \textbf{giao dịch hợp lệ}, được định nghĩa bởi đồng thời bốn điều kiện:
+
+\begin{itemize}
+    \item Là sự kiện \texttt{purchase}.
+    \item Có \texttt{transaction\_id} khác \texttt{NULL} và không thuộc các giá trị giữ chỗ \texttt{'(not set)'}, \texttt{'<Other>'}, \texttt{'(data deleted)'} hoặc chuỗi rỗng.
+    \item Có doanh thu \texttt{purchase\_revenue\_in\_usd} lớn hơn 0.
+    \item Nếu một người dùng (\texttt{user\_pseudo\_id}) có phát sinh được nhiều sự kiện có trùng \texttt{transaction\_id}, chỉ giữ lấy sự kiện có thuộc tính \texttt{event\_timestamp} sớm nhất.
+\end{itemize}
+
+Định nghĩa này được cài đặt một lần duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và được mọi bảng fact, bảng tổng hợp và KPI kế thừa; các bản ghi bị loại theo từng điều kiện được ghi vào nhật ký chất lượng dữ liệu. \medskip
 
 Chuyển đổi là sự kiện \texttt{purchase} được ghi nhận theo nguồn của phiên hoặc theo nguồn của người dùng nếu không xác định được nguồn phiên. Quy tắc này giải quyết rủi ro so sánh không đồng nhất nêu ở mục 2.1 và 2.2. Nhóm sẽ ghi rõ mô hình phân bổ được sử dụng.
 
@@ -313,7 +332,7 @@ Vấn đề 1, 2, 3, 5 được giải quyết đầy đủ trên dữ liệu th
 
 \subsection*{Phạm vi.}
 
-Hệ thống xử lý dữ liệu theo lô (batch) trên bộ dữ liệu mẫu trong ba tháng, chưa triển khai thu thập thời gian thực và chưa kết nối trực tiếp với API của các nền tảng quảng cáo. Kiến trúc được thiết kế để có thể bổ sung nguồn mới (Google Ads, Meta Ads, TikTok Ads, email) và bảng chi phí thực bằng cách thêm bộ trích xuất và ánh xạ về cùng mô hình chiều.\\
+Hệ thống xử lý bộ dữ liệu mẫu ba tháng theo cơ chế phát lại: Python Publisher truy vấn dữ liệu lịch sử và phát từng sự kiện qua Pub/Sub theo thứ tự thời gian, Dataflow xử lý luồng và ghi vào bảng thô, mô phỏng quá trình tiếp nhận dữ liệu trực tuyến. Hệ thống chưa kết nối với nguồn dữ liệu thật phát sinh thời gian thực và chưa kết nối trực tiếp với API của các nền tảng quảng cáo. Kiến trúc được thiết kế để có thể bổ sung nguồn mới (Google Ads, Meta Ads, TikTok Ads, email) và bảng chi phí thực bằng cách thêm bộ trích xuất và ánh xạ về cùng mô hình chiều.\\
 
 
 \subsection*{Giả định.}
@@ -336,24 +355,3 @@ Hệ thống xử lý dữ liệu theo lô (batch) trên bộ dữ liệu mẫu 
 
     \item Lợi ích kỳ vọng chưa được đo trên quy trình thực; nhóm đánh giá hệ thống qua kiểm thử tính đúng đắn của dữ liệu, tính nhất quán KPI, hiệu năng truy vấn và mức độ đáp ứng các câu hỏi nghiệp vụ.
 \end{itemize}
-
-
-% \subsection{Yêu cầu nghiệp vụ}
-
-% Hệ thống được xây dựng để đáp ứng bốn nhóm yêu cầu nghiệp vụ chính sau.
-
-% \subsubsection{Theo dõi hiệu quả chuyển đổi}
-
-% Quản lý và chuyên viên cần đánh giá đủ phễu mua hàng: số người dùng và số phiên đạt từng bước (xem sản phẩm, thêm giỏ, bắt đầu thanh toán, mua hàng, tùy chọn hai bước trung gian giao hàng và thanh toán), tỷ lệ chuyển tiếp giữa các bước và tỷ lệ chuyển đổi tổng thể. Các chỉ số này cần phân tích được theo ngày, tuần, thiết bị và khu vực, kèm so sánh với kỳ trước để phát hiện bước có tỷ lệ chuyển tiếp thấp hoặc suy giảm bất thường. Yêu cầu này giúp trả lời câu hỏi liệu hành trình mua hàng đang suy giảm tại đâu, và là cơ sở cho toàn bộ phần cảnh báo của hệ thống.
-
-% \subsubsection{So sánh hiệu quả theo nguồn truy cập}
-
-% Giám đốc Marketing và quản lý cần so sánh các nguồn truy cập theo hai tầng quy kết (cấp phiên và cấp người dùng): số người dùng, tỷ lệ chuyển đổi, số người mua hàng và giá trị mua hàng ghi nhận theo nguồn; phân biệt người dùng mới và quay lại dựa trên sự kiện \texttt{first\_visit}. Yêu cầu này giúp đánh giá kênh nào tạo ra hành vi chất lượng và kênh nào có lưu lượng lớn nhưng ít chuyển đổi. Ranh giới bắt buộc: bộ dữ liệu không chứa chi phí quảng cáo, do đó hệ thống không tính ROI/ROAS thực và không đưa ra kết luận về hiệu quả đầu tư quảng cáo; các tham số chi phí, nếu minh họa, chỉ xuất hiện ở chế độ giả định do người dùng nhập.
-
-% \subsubsection{Đánh giá hiệu quả sản phẩm và nội dung hiển thị}
-
-% Chuyên viên cần nhận diện sản phẩm và danh mục được quan tâm nhiều nhưng ít chuyển thành mua hàng: sản phẩm xem nhiều nhưng ít được thêm vào giỏ, sản phẩm thêm giỏ nhiều nhưng ít được mua; đóng góp giá trị mua hàng theo sản phẩm và theo hierarchy danh mục (ba cấp). Yêu cầu này hỗ trợ quyết định về nội dung trang sản phẩm, vị trí hiển thị và chương trình quảng bá, và sử dụng trực tiếp dữ liệu mặt hàng đã chuẩn hóa.
-
-% \subsubsection{Phân tích hành vi và hỗ trợ ưu tiên hành động}
-
-% Ba nhóm người ra quyết định đều cần hệ thống tổng hợp các tín hiệu nêu trên thành khuyến nghị có thứ tự ưu tiên: cảnh báo theo ngưỡng do người dùng cấu hình (ví dụ: tỷ lệ giỏ sang thanh toán giảm dưới ngưỡng, kèm bằng chứng số liệu và hành động đề xuất điều tra); phân cụm phiên theo đặc trưng hành vi để xác định nhóm có tiềm năng chuyển đổi; và mô phỏng giả định (what-if) ước lượng tác động của việc cải thiện một bước phễu lên lượng mua hàng. Yêu cầu này biến kho dữ liệu từ công cụ báo cáo thành công cụ hỗ trợ quyết định, và là tiêu chí đánh giá chính của thành phần ứng dụng theo đề cương môn học.

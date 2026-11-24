@@ -1,17 +1,17 @@
 name: Build LaTeX report
 
 # ==========================================================================
-# Workflow biên dịch báo cáo LaTeX (thư mục report/) thành PDF trên GitHub.
-# Các lệnh bên dưới đều được chú thích để dễ rà soát; workflow KHÔNG chạy cục bộ,
-# mọi cài đặt/biên dịch diễn ra trên hạ tầng GitHub Actions.
+# Workflow that compiles the LaTeX report (report/) into a PDF on GitHub.
+# Every step below is annotated for easy review; the workflow NEVER runs
+# locally — all setup and compilation happens on GitHub Actions.
 # ==========================================================================
 
-# --- Kích hoạt (trigger) ------------------------------------------------
-# on.push   : tự động chạy khi push lên branch main/master, NHƯNG CHỈ khi
-#             có thay đổi trong report/ hoặc trong chính workflow này
-#             (giúp tiết kiệm phút CI khi sửa các file ngoài báo cáo).
-# on.pull_request: tương tự, chạy kiểm tra trên pull request.
-# on.workflow_dispatch: cho phép chạy thủ công từ tab Actions của GitHub.
+# --- Triggers -------------------------------------------------------------
+# on.push   : runs automatically on pushes to main/master, but ONLY when
+#             files under report/ or this workflow itself change
+#             (saves CI minutes when editing files outside the report).
+# on.pull_request: same paths, runs as a check on pull requests.
+# on.workflow_dispatch: allows manual runs from the GitHub Actions tab.
 on:
   push:
     branches: [main, master]
@@ -24,50 +24,51 @@ on:
       - '.github/workflows/build-report.yml'
   workflow_dispatch:
 
-# --- Hủy bản chạy cũ -----------------------------------------------------
-# concurrency: nếu push liên tiếp nhiều commit, chỉ giữ lần chạy mới nhất
-# của từng branch (github.ref) và hủy các lần đang chạy dở -- tránh tốn tài nguyên.
+# --- Cancel stale runs ----------------------------------------------------
+# concurrency: on rapid successive pushes, keep only the latest run per
+# branch (github.ref) and cancel in-progress ones to save resources.
 concurrency:
   group: report-latex-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    # Máy ảo Ubuntu miễn phí do GitHub cung cấp (ubuntu-latest = 24.04).
+    # Free Ubuntu VM provided by GitHub (ubuntu-latest = 24.04).
     runs-on: ubuntu-latest
 
     steps:
-      # Bước 1: tải mã nguồn repository về máy ảo ở thư mục $GITHUB_WORKSPACE.
-      # actions/checkout@v4 là phiên bản chính (major) hiện hành.
+      # Step 1: check out the repository into $GITHUB_WORKSPACE.
+      # actions/checkout@v4 is the current major version.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Bước 2: biên dịch LaTeX bằng Docker image TeXLive full.
+      # Step 2: compile LaTeX using the full TeXLive Docker image.
       # xu-cheng/latex-action@v3:
-      #   - chạy trong container texlive-full (chứa pdflatex, latexmk, biber,
-      #     vntex cho tiếng Việt, tikz, algorithm2e, glossaries-extra, ...);
-      #   - mặc định dùng latexmk với tham số:
-      #       -pdf                          -> xuất PDF (dùng pdflatex)
-      #       -file-line-error              -> lỗi hiển thị dạng file:dòng:cột
-      #       -interaction=nonstopmode      -> không dừng chờ gõ lệnh khi gặp lỗi
-      #       -halt-on-error                -> dừng ngay ở lỗi đầu tiên -> job fail
-      #   - latexmk tự chạy ĐỦ SỐ LẦN (rerun) cho mục lục, danh sách hình/bảng
-      #     hội tụ, và tự gọi BIBER vì main.tex dùng biblatex (\addbibresource);
-      #   - working_directory/report: mọi đường dẫn tương đối (text/, image/)
-      #     được resolve đúng như biên dịch cục bộ trong thư mục report/.
+      #   - runs inside the texlive-full container (ships pdflatex, latexmk,
+      #     biber, vntex for Vietnamese, tikz, algorithm2e, glossaries-extra, ...);
+      #   - latexmk defaults:
+      #       -pdf                          -> produce a PDF (uses pdflatex)
+      #       -file-line-error              -> errors shown as file:line:column
+      #       -interaction=nonstopmode      -> never stop and wait for input on errors
+      #       -halt-on-error                -> stop at the first error -> job fails
+      #   - latexmk reruns ENOUGH passes for the table of contents and lists
+      #     of figures/tables to converge, and calls BIBER itself because
+      #     main.tex uses biblatex (\addbibresource);
+      #   - working_directory: report keeps relative paths (text/, image/)
+      #     resolving exactly like a local build inside report/.
       - name: Compile LaTeX document
         uses: xu-cheng/latex-action@v3
         with:
-          working_directory: report   # thư mục chứa main.tex
-          root_file: main.tex          # file gốc cần biên dịch
+          working_directory: report   # folder holding main.tex
+          root_file: main.tex         # root file to compile
 
-      # Bước 3: đăng ký file PDF kết quả như một artifact để tải về từ tab
-      # Actions. if-no-files-found: error -> nếu biên dịch không tạo được
-      # main.pdf thì job báo lỗi ngay (phát hiện sớm thất bại im lặng).
-      # Thời gian giữ artifact mặc định của repository (thường 90 ngày).
+      # Step 3: upload the resulting PDF as an artifact downloadable from the
+      # Actions tab. if-no-files-found: error -> if the build produced no
+      # main.pdf the job fails immediately (catches silent failures early).
+      # Artifact retention follows the repository default (usually 90 days).
       - name: Upload PDF artifact
         uses: actions/upload-artifact@v4
         with:
-          name: report-pdf            # tên artifact hiển thị trên GitHub
-          path: report/main.pdf       # file kết quả biên dịch
+          name: report-pdf            # artifact name shown on GitHub
+          path: report/main.pdf       # build output file
           if-no-files-found: error
