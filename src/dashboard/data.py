@@ -14,6 +14,7 @@ Ratios are never stored: pages compute them from the additive columns after
 filtering (src/dashboard/kpi.py).
 """
 
+import numpy as np
 import pandas as pd
 
 from src.dashboard.config import Settings
@@ -169,6 +170,20 @@ def coerce(df: pd.DataFrame, schema: dict[str, str]) -> pd.DataFrame:
     return out
 
 
+# Columns added after loading, for grouping in the analysis pages
+DERIVED_SESSION_COLUMNS = ("source_medium", "user_type")
+
+
+def derive_session_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Add DERIVED_SESSION_COLUMNS to a coerced session frame."""
+    out = df.copy()
+    out["source_medium"] = (out["source"] + " / " + out["medium"]).astype("string")
+    out["user_type"] = pd.Series(
+        np.where(out["is_new_user_session"] == 1, "Người dùng mới", "Người dùng cũ"),
+        index=out.index, dtype="string")
+    return out
+
+
 def _query_bigquery(sql: str, project_id: str) -> pd.DataFrame:
     if not project_id:
         raise ValueError("GCP_PROJECT_ID is empty; set it in .env to read BigQuery")
@@ -187,7 +202,7 @@ def load_sessions(settings: Settings) -> pd.DataFrame:
         from src.dashboard.mock import make_sessions
 
         raw = make_sessions()
-    return coerce(raw, SESSION_COLUMNS)
+    return derive_session_columns(coerce(raw, SESSION_COLUMNS))
 
 
 def load_products(settings: Settings) -> pd.DataFrame:

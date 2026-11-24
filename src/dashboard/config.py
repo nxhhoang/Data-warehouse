@@ -29,6 +29,17 @@ CHANNEL_GROUPS = (
 )
 DEVICE_CATEGORIES = ("desktop", "mobile", "tablet", "Unknown")
 
+# Dimensions offered by the analysis pages: label -> session frame column
+DIMENSIONS = {
+    "Kênh": "channel_group",
+    "Nguồn / Medium": "source_medium",
+    "Chiến dịch": "campaign",
+    "Thiết bị": "device_category",
+    "Quốc gia": "country",
+    "Loại trang vào": "landing_page_type",
+    "Người dùng mới/cũ": "user_type",
+}
+
 # Data window of the GA4 sample dataset (dbt vars start_date / end_date).
 DATA_START = "2020-11-01"
 DATA_END = "2021-01-31"

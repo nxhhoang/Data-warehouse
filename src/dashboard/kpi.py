@@ -28,6 +28,16 @@ def kpi_dictionary() -> dict[str, dict]:
         return {item["id"]: item for item in yaml.safe_load(f)["kpis"]}
 
 
+def label(kpi_id: str) -> str:
+    """Vietnamese KPI name from the dictionary."""
+    return kpi_dictionary()[kpi_id]["name"]
+
+
+def unit(kpi_id: str) -> str:
+    """KPI unit from the dictionary ('%', 'USD', 'phiên', ...)."""
+    return kpi_dictionary()[kpi_id]["unit"]
+
+
 def _div(num: float, den: float) -> float:
     """SAFE_DIVIDE: NaN instead of an error when the denominator is 0."""
     return float(num) / float(den) if den else np.nan
@@ -87,6 +97,24 @@ def summarize(df: pd.DataFrame) -> dict[str, float]:
         "revenue_per_session_usd": _div(t["revenue_usd"], t["sessions"]),
         "revenue_per_user_usd": _div(t["revenue_usd"], t["users"]),
     }
+
+
+# 01-10/11/2020: every purchase in the source has transaction_id '(not set)', so the
+# valid-order rule keeps no order on those days (883 such purchases over 92 days,
+# USD 31,817 of revenue excluded).
+NO_VALID_ORDER_DAYS = (pd.Timestamp("2020-11-01"), pd.Timestamp("2020-11-10"))
+ORDER_KPIS = ("orders", "conversion_rate", "revenue_usd", "aov_usd",
+              "revenue_per_session_usd", "revenue_per_user_usd", "purchase_completion_rate")
+
+
+def no_valid_order_note(start: pd.Timestamp, end: pd.Timestamp) -> str | None:
+    """Warning text when [start, end] overlaps the days without valid orders."""
+    first, last = NO_VALID_ORDER_DAYS
+    if start > last or end < first:
+        return None
+    return ("01–10/11/2020: mọi sự kiện purchase trong dữ liệu gốc có transaction_id "
+            "'(not set)', nên không có giao dịch hợp lệ; đơn hàng và doanh thu các ngày "
+            "này bằng 0 do quy tắc lọc, không phải do sụt giảm thật.")
 
 
 def time_series(df: pd.DataFrame, kpi_id: str, grain: str) -> pd.DataFrame:

@@ -14,8 +14,8 @@ pytest.importorskip("yaml")
 
 from src.dashboard import kpi  # noqa: E402
 from src.dashboard.config import CHANNEL_GROUPS, Settings  # noqa: E402
-from src.dashboard.data import (PRODUCT_COLUMNS, SESSION_COLUMNS,  # noqa: E402
-                                coerce, load_products, load_sessions)
+from src.dashboard.data import (DERIVED_SESSION_COLUMNS, PRODUCT_COLUMNS,  # noqa: E402
+                                SESSION_COLUMNS, coerce, load_products, load_sessions)
 from src.dashboard.filters import Filters, apply_filters, apply_product_filters  # noqa: E402
 from src.dashboard.formatting import fmt_delta, fmt_value  # noqa: E402
 from src.dashboard.mock import make_sessions, untracked_add_to_cart_days  # noqa: E402
@@ -49,7 +49,8 @@ def _frame(*rows):
 # ---------- data layer ----------
 
 def test_mock_sessions_match_schema(sessions):
-    assert list(sessions.columns) == list(SESSION_COLUMNS)
+    assert list(sessions.columns) == [*SESSION_COLUMNS, *DERIVED_SESSION_COLUMNS]
+    assert set(sessions["user_type"]) == {"Người dùng mới", "Người dùng cũ"}
     assert sessions["session_id"].is_unique
     assert set(sessions["channel_group"]) <= set(CHANNEL_GROUPS)
     assert sessions["session_date"].min() == pd.Timestamp("2020-11-01")

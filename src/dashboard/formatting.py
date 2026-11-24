@@ -49,6 +49,29 @@ def fmt_delta(change: float) -> str | None:
     return ("+" if change >= 0 else "") + _vn(change * 100, 1) + "%"
 
 
+def kpi_display_table(table, key_col: str, key_label: str, kpi_ids, extra=None):
+    """Copy of ``table`` with KPI columns formatted and renamed for st.dataframe.
+
+    Parameters
+    ----------
+    table : pandas.DataFrame
+        Must contain ``key_col`` and every id of ``kpi_ids``.
+    key_col, key_label : str
+        Grouping column and its display name.
+    kpi_ids : iterable of str
+        KPI ids (dictionary) to show, in order.
+    extra : dict, optional
+        Other column -> display name, appended unformatted.
+    """
+    from src.dashboard import kpi
+
+    extra = extra or {}
+    shown = table[[key_col, *kpi_ids, *extra]].copy()
+    for kpi_id in kpi_ids:
+        shown[kpi_id] = shown[kpi_id].map(lambda v, u=kpi.unit(kpi_id): fmt_value(v, u))
+    return shown.rename(columns={key_col: key_label, **{k: kpi.label(k) for k in kpi_ids}, **extra})
+
+
 def style_figure(fig, height: int = 360):
     """Recessive axes/grid, thin marks, unified hover; returns ``fig``."""
     fig.update_layout(

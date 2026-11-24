@@ -7,19 +7,15 @@ import streamlit as st
 from src.dashboard import kpi
 from src.dashboard.context import PageContext
 from src.dashboard.filters import apply_filters
-from src.dashboard.formatting import PRIMARY, fmt_delta, fmt_value, style_figure
+from src.dashboard.formatting import (PRIMARY, fmt_delta, fmt_value, kpi_display_table,
+                                      style_figure)
 
 HEADLINE_KPIS = ("sessions", "users", "conversion_rate", "orders", "revenue_usd", "aov_usd")
 TABLE_KPIS = ("sessions", "users", "conversion_rate", "orders", "revenue_usd",
               "revenue_per_session_usd", "revenue_share_total")
 
 
-def _label(kpi_id: str) -> str:
-    return kpi.kpi_dictionary()[kpi_id]["name"]
-
-
-def _unit(kpi_id: str) -> str:
-    return kpi.kpi_dictionary()[kpi_id]["unit"]
+_label, _unit = kpi.label, kpi.unit
 
 
 def _render_headline(ctx: PageContext, current: dict) -> None:
@@ -62,6 +58,9 @@ def _render_trend(df) -> None:
     if _unit(kpi_id) == "%":
         fig.update_yaxes(tickformat=".1%")
     st.plotly_chart(style_figure(fig), width="stretch")
+    note = kpi.no_valid_order_note(df["session_date"].min(), df["session_date"].max())
+    if note and kpi_id in kpi.ORDER_KPIS:
+        st.caption(note)
     if kpi_id in kpi.CART_DEPENDENT:
         st.caption("add_to_cart không được ghi nhận trong 18/92 ngày; các ngày đó để trống, "
                    "không nội suy.")
@@ -75,11 +74,8 @@ def _render_channels(df) -> None:
     st.markdown(f"**{_label('revenue_usd')} theo kênh**")
     st.plotly_chart(style_figure(fig, height=40 + 32 * len(bars)), width="stretch")
 
-    shown = table[["channel_group", *TABLE_KPIS]].copy()
-    for kpi_id in TABLE_KPIS:
-        shown[kpi_id] = shown[kpi_id].map(lambda v, u=_unit(kpi_id): fmt_value(v, u))
-    shown = shown.rename(columns={"channel_group": "Kênh", **{k: _label(k) for k in TABLE_KPIS}})
-    st.dataframe(shown, hide_index=True, width="stretch")
+    st.dataframe(kpi_display_table(table, "channel_group", "Kênh", TABLE_KPIS),
+                 hide_index=True, width="stretch")
 
 
 def render(ctx: PageContext) -> None:
