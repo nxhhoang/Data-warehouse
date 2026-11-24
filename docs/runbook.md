@@ -67,10 +67,12 @@ Dataset public `bigquery-public-data.ga4_obfuscated_sample_ecommerce` query đư
 python src/extract/publisher.py
 
 # 4.2 Chạy pipeline ở chế độ streaming, DirectRunner, ghi vào dataset thô
+#     FILE_LOADS cần bucket GCS làm nơi chứa file tạm (tầng miễn phí của GCS là đủ)
 python src/pipeline/dataflow_pipeline.py \
     --input_subscription=projects/$GCP_PROJECT_ID/subscriptions/ga4-events-sub \
     --raw_dataset=$RAW_DATASET \
-    --project=$GCP_PROJECT_ID --region=asia-southeast1 \
+    --temp_location=gs://$GCP_PROJECT_ID-df-temp/temp \
+    --project=$GCP_PROJECT_ID --region=us-central1 \
     --runner=DirectRunner
 
 # 4.3 Xây kho dữ liệu (dbt đọc bảng thô do pipeline ghi qua biến BQ_RAW_*)
