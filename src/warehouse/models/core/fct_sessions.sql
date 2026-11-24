@@ -5,8 +5,10 @@ WITH events_with_keys AS (
         e.event_date,
         e.date_key,
         e.event_timestamp,
+        e.event_ts_utc,
         e.event_bundle_sequence_id,
         e.event_name,
+        e.ga_session_number,
         e.engaged_session_event,
         e.session_engaged,
         e.engagement_time_msec,
@@ -51,6 +53,7 @@ session_first_attrs AS (
         session_id,
         -- Cross-midnight session rule (0.23%): take the date of the first event in the session
         FIRST_VALUE(date_key) OVER w_asc AS date_key,
+        FIRST_VALUE(event_ts_utc) OVER w_asc AS session_start_ts,
         FIRST_VALUE(user_key) OVER w_asc AS user_key,
         FIRST_VALUE(user_source_key) OVER w_asc AS user_source_key,
         FIRST_VALUE(device_key) OVER w_asc AS device_key,
@@ -76,6 +79,12 @@ session_metrics AS (
         COUNTIF(event_name = 'view_item') AS view_item_count,
         SUM(engagement_time_msec) AS engagement_time_msec,
         MAX(CASE WHEN session_engaged = '1' OR engaged_session_event = 1 THEN 1 ELSE 0 END) AS is_engaged,
+        -- New-user session = the session holding the user's first_visit (same rule as
+        -- the new_user_rate KPI); every later session of that user counts as returning
+        MAX(CASE WHEN event_name = 'first_visit' THEN 1 ELSE 0 END) AS is_new_user_session,
+        -- GA4's own per-user session counter (survey 07: present on 100% of events);
+        -- unlike a ROW_NUMBER over our window it also counts sessions before 2020-11-01
+        MAX(ga_session_number) AS user_session_number,
         MAX(CASE WHEN event_name = 'view_item' THEN 1 ELSE 0 END) AS has_view_item,
         MAX(CASE WHEN event_name = 'add_to_cart' THEN 1 ELSE 0 END) AS has_add_to_cart,
         MAX(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS has_begin_checkout,
@@ -107,6 +116,9 @@ SELECT
         WHEN fa.first_session_source_key IS NOT NULL THEN 'session'
         ELSE 'user_fallback'
     END AS attribution_basis,
+    fa.session_start_ts,
+    sm.is_new_user_session,
+    COALESCE(sm.user_session_number, -1) AS user_session_number,
     sm.event_count,
     sm.page_view_count,
     sm.view_item_count,
