@@ -59,12 +59,13 @@ restart the command if a changed module is not reloaded.
 | `filters.py` | Feature 2: filter state, `apply_filters`, sidebar widgets |
 | `formatting.py` | Vietnamese number format, chart palette and styling |
 | `context.py` | `PageContext` handed to every page |
-| `analysis/` | Pure-pandas logic per feature (`funnel.py`, `compare.py`, `channel_quality.py`), unit tested |
+| `analysis/` | Pure-pandas logic per feature (`compare.py`, `channel_quality.py`, `funnel.py`, `drilldown.py`), unit tested |
 | `views/overview.py` | Feature 1: executive overview |
 | `views/compare.py` | Feature 3: groups side by side with ranking; two periods |
 | `views/channel_quality.py` | Feature 4: volume vs quality quadrants |
 | `views/funnel.py` | Feature 5: 6-step funnel, segments heatmap, product groups |
-| `views/planned.py` | Placeholders for features 6–10 (scope + data source) |
+| `views/drilldown.py` | Feature 6: channel → source/medium → campaign, month → week → day, product group → product |
+| `views/planned.py` | Placeholders for features 7–10 (scope + data source) |
 
 ## Rules
 

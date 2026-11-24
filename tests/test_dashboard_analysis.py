@@ -186,3 +186,71 @@ def test_drop_rate_is_never_negative():
 def test_no_valid_order_note(start, end, has_note):
     note = kpi.no_valid_order_note(pd.Timestamp(start), pd.Timestamp(end))
     assert (note is not None) == has_note
+
+
+# ---------- drill-down ----------
+
+from src.dashboard.analysis import drilldown as dd  # noqa: E402
+
+CHANNEL_H, TIME_H, PRODUCT_H = dd.HIERARCHIES
+
+
+def test_drill_levels_partition_the_parent(sessions):
+    top = dd.level_table(sessions, CHANNEL_H, ())
+    assert top["sessions"].sum() == len(sessions)
+    channel = top.loc[0, "key"]
+    children = dd.level_table(sessions, CHANNEL_H, (channel,))
+    assert children["sessions"].sum() == (sessions["channel_group"] == channel).sum()
+    assert children["revenue_share_total"].sum() == pytest.approx(1.0)
+
+
+def test_drill_path_filters_every_level(sessions):
+    channel = sessions["channel_group"].iloc[0]
+    source = sessions.loc[sessions["channel_group"] == channel, "source_medium"].iloc[0]
+    rows = dd.subset(sessions, CHANNEL_H, (channel, source))
+    assert set(rows["channel_group"]) == {channel}
+    assert set(rows["source_medium"]) == {source}
+    table = dd.level_table(sessions, CHANNEL_H, (channel, source))
+    assert table["sessions"].sum() == len(rows)
+
+
+def test_time_hierarchy_is_chronological_and_nested(sessions):
+    df = dd.prepare(sessions, TIME_H)
+    months = dd.level_table(df, TIME_H, ())
+    assert list(months["key"]) == sorted(months["key"])
+    assert len(months) == 3
+    nov = pd.Timestamp("2020-11-01")
+    weeks = dd.level_table(df, TIME_H, (nov,))
+    assert (weeks["key"].dt.day_of_week == 0).all()        # weeks start on Monday
+    week = weeks.loc[1, "key"]
+    days = dd.level_table(df, TIME_H, (nov, week))
+    assert len(days) <= 7
+    assert days["key"].between(week, week + pd.Timedelta(days=6)).all()
+
+
+def test_product_hierarchy_sums_measures():
+    products = load_products(MOCK)
+    top = dd.level_table(products, PRODUCT_H, ())
+    assert top["item_revenue_usd"].sum() == pytest.approx(products["item_revenue_usd"].sum())
+    assert top["item_revenue_usd"].is_monotonic_decreasing
+    assert top["revenue_share"].sum() == pytest.approx(1.0)
+
+
+def test_can_drill_stops_at_the_last_level():
+    assert dd.can_drill(CHANNEL_H, ())
+    assert dd.can_drill(CHANNEL_H, ("Direct",))
+    assert not dd.can_drill(CHANNEL_H, ("Direct", "(direct) / (none)"))
+    assert dd.can_drill(PRODUCT_H, ())
+    assert not dd.can_drill(PRODUCT_H, ("Apparel",))
+
+
+def test_path_deeper_than_hierarchy_is_rejected(sessions):
+    with pytest.raises(ValueError):
+        dd.subset(sessions, PRODUCT_H, ("a", "b", "c"))
+
+
+def test_format_key_time_levels():
+    month, week, day = TIME_H.levels
+    assert dd.format_key(pd.Timestamp("2020-12-01"), month) == "Tháng 12/2020"
+    assert dd.format_key(pd.Timestamp("2020-11-30"), week) == "Tuần 30/11 – 06/12/2020"
+    assert dd.format_key(pd.Timestamp("2020-12-05"), day) == "05/12/2020"
