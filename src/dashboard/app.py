@@ -19,7 +19,8 @@ from src.dashboard.config import Settings, get_settings  # noqa: E402
 from src.dashboard.context import PageContext  # noqa: E402
 from src.dashboard.data import load_products, load_sessions  # noqa: E402
 from src.dashboard.filters import render_sidebar  # noqa: E402
-from src.dashboard.views import channel_quality, compare, funnel, overview, planned  # noqa: E402
+from src.dashboard.views import (channel_quality, compare, drilldown, funnel,  # noqa: E402
+                                 overview, planned)
 
 CACHE_TTL_SEC = 3600
 
@@ -53,20 +54,15 @@ def main() -> None:
         # Explicit url_path: lambdas have no meaningful __name__
         return st.Page(fn, title=title, url_path=url_path, **kwargs)
 
-    nav = st.navigation({
-        "Bản cơ bản (M5)": [
-            page(lambda: overview.render(ctx), "1. Tổng quan", "tong-quan", default=True),
-            page(lambda: compare.render(ctx), "3. So sánh hiệu suất", "so-sanh"),
-            page(lambda: channel_quality.render(ctx), "4. Chất lượng kênh", "chat-luong-kenh"),
-            page(lambda: funnel.render(ctx), "5. Phễu chuyển đổi", "pheu"),
-            *[page(lambda f=f: planned.render(f, ctx), f"{f.number}. {f.title}", f.url_path)
-              for f in planned.PLANNED if f.milestone == "M5"],
-        ],
-        "Nâng cao (M6)": [
-            page(lambda f=f: planned.render(f, ctx), f"{f.number}. {f.title}", f.url_path)
-            for f in planned.PLANNED if f.milestone == "M6"
-        ],
-    })
+    nav = st.navigation([
+        page(lambda: overview.render(ctx), "1. Tổng quan", "tong-quan", default=True),
+        page(lambda: compare.render(ctx), "3. So sánh hiệu suất", "so-sanh"),
+        page(lambda: channel_quality.render(ctx), "4. Chất lượng kênh", "chat-luong-kenh"),
+        page(lambda: funnel.render(ctx), "5. Phễu chuyển đổi", "pheu"),
+        page(lambda: drilldown.render(ctx), "6. Phân tích chi tiết", "chi-tiet"),
+        *[page(lambda f=f: planned.render(f, ctx), f"{f.number}. {f.title}", f.url_path)
+          for f in planned.PLANNED],
+    ])
     nav.run()
 
 
