@@ -65,11 +65,12 @@ session_first_attrs AS (
             ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         ) AS first_session_source_key
     FROM events_with_keys
+    -- BigQuery clause order: QUALIFY must come before WINDOW
+    QUALIFY ROW_NUMBER() OVER w_asc = 1
     WINDOW w_asc AS (
         PARTITION BY session_id
         ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
     )
-    QUALIFY ROW_NUMBER() OVER w_asc = 1
 ),
 session_metrics AS (
     SELECT

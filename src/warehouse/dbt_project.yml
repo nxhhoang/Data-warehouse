@@ -12,6 +12,9 @@ vars:
   # dbt run --vars '{"start_date": "20201101", "end_date": "20201107"}'
   start_date: '20201101'
   end_date: '20210131'
+  # Date partitioning of fct_events. Keep false on BigQuery Sandbox: its 60-day
+  # partition expiration deletes every 2020 partition immediately.
+  partition_tables: false
 
 models:
   marketing_dw:

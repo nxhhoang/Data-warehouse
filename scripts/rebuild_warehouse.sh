@@ -10,7 +10,8 @@ elif [ -f .venv/bin/python ]; then
 else
   PY=python3
 fi
-DBT="$(dirname "$PY")/dbt"
+# Absolute path: the script later runs dbt from inside src/warehouse
+DBT="$(cd "$(dirname "$PY")" && pwd)/dbt"
 command -v "$DBT" >/dev/null 2>&1 || DBT=dbt
 
 # Load .env if present so GCP_PROJECT_ID reaches dbt (env_var) and the KPI deploy
