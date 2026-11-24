@@ -20,18 +20,6 @@ class PlannedFeature:
 
 
 PLANNED = (
-    PlannedFeature(3, "So sánh hiệu suất", "so-sanh", "M5",
-                   "Đặt nhiều kênh, chiến dịch hoặc kỳ cạnh nhau trên cùng bộ chỉ số; "
-                   "xếp hạng theo doanh thu, tỷ lệ chuyển đổi, doanh thu/phiên.",
-                   "sessions (kpi.breakdown theo channel_group / campaign)"),
-    PlannedFeature(4, "Chất lượng kênh", "chat-luong-kenh", "M5",
-                   "Đối chiếu quy mô lưu lượng với chất lượng (tương tác, chuyển đổi, "
-                   "doanh thu/phiên): kênh nhiều truy cập ít đơn và ngược lại.",
-                   "sessions"),
-    PlannedFeature(5, "Phễu chuyển đổi", "pheu", "M5",
-                   "Phễu 6 bước view_item → add_to_cart → begin_checkout → add_shipping_info "
-                   "→ add_payment_info → purchase; bước rời bỏ cao nhất; chia theo kênh/thiết bị.",
-                   "sessions (cờ has_*); products cho nhóm sản phẩm"),
     PlannedFeature(6, "Phân tích chi tiết", "chi-tiet", "M5",
                    "Kênh → chiến dịch, tháng → ngày, nhóm sản phẩm → sản phẩm.",
                    "sessions, products"),

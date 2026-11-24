@@ -59,8 +59,12 @@ restart the command if a changed module is not reloaded.
 | `filters.py` | Feature 2: filter state, `apply_filters`, sidebar widgets |
 | `formatting.py` | Vietnamese number format, chart palette and styling |
 | `context.py` | `PageContext` handed to every page |
+| `analysis/` | Pure-pandas logic per feature (`funnel.py`, `compare.py`, `channel_quality.py`), unit tested |
 | `views/overview.py` | Feature 1: executive overview |
-| `views/planned.py` | Placeholders for features 3–10 (scope + data source) |
+| `views/compare.py` | Feature 3: groups side by side with ranking; two periods |
+| `views/channel_quality.py` | Feature 4: volume vs quality quadrants |
+| `views/funnel.py` | Feature 5: 6-step funnel, segments heatmap, product groups |
+| `views/planned.py` | Placeholders for features 6–10 (scope + data source) |
 
 ## Rules
 
@@ -68,8 +72,9 @@ restart the command if a changed module is not reloaded.
 - Ratios are recomputed from numerators/denominators after filtering (`kpi.summarize`);
   never sum or average ratio columns.
 - KPI names, units and formulas shown to users come from `kpi_dictionary.yaml`.
-- To build a feature: add `views/<feature>.py` with `render(ctx)`, register it in
-  `app.py`, remove its entry from `views/planned.PLANNED`, add tests in `tests/test_dashboard.py`.
+- To build a feature: put the logic in `analysis/<feature>.py` (no Streamlit), the page in
+  `views/<feature>.py` with `render(ctx)`, register it in `app.py`, remove its entry from
+  `views/planned.PLANNED`, add tests in `tests/test_dashboard_analysis.py`.
 
 ## Known data limits
 
@@ -77,3 +82,9 @@ restart the command if a changed module is not reloaded.
   do not apply to product figures.
 - New/returning (`is_new_user_session`) relies on the `first_visit` event; users
   first seen before 2020-11-01 only appear as returning.
+- 01–10/11/2020 have no valid order: every purchase there has transaction_id `(not set)`
+  (883 such purchases over the 92 days, USD 31,817 excluded). `kpi.no_valid_order_note`
+  returns the caption pages show when a range touches those days.
+- In the obfuscated data the items viewed/added to cart and the items purchased are almost
+  disjoint catalogues (4 of 427 viewed item_ids were sold), so the funnel has no
+  per-product view → purchase rate.
