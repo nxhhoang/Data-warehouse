@@ -46,7 +46,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import apache_beam as beam
-import yaml
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
 from apache_beam.pvalue import TaggedOutput
 
@@ -197,6 +196,10 @@ def load_quality_config(path: str) -> dict:
                 "event_bundle_sequence_id",
             ],
         }
+    # Lazy import: keeps pyyaml off the Dataflow workers, which only import
+    # this module for its DoFn classes — this function runs once, on the
+    # job-submission machine only.
+    import yaml
     with config_path.open(encoding="utf-8") as handle:
         rules = yaml.safe_load(handle) or {}
     return {
