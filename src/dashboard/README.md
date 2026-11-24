@@ -59,13 +59,16 @@ restart the command if a changed module is not reloaded.
 | `filters.py` | Feature 2: filter state, `apply_filters`, sidebar widgets |
 | `formatting.py` | Vietnamese number format, chart palette and styling |
 | `context.py` | `PageContext` handed to every page |
-| `analysis/` | Pure-pandas logic per feature (`compare.py`, `channel_quality.py`, `funnel.py`, `drilldown.py`), unit tested |
+| `analysis/` | Pure-pandas logic per feature (`compare.py`, `channel_quality.py`, `funnel.py`, `drilldown.py`, `segments.py`, `alerts.py`, `scenario.py`, `trace.py`), unit tested |
 | `views/overview.py` | Feature 1: executive overview |
 | `views/compare.py` | Feature 3: groups side by side with ranking; two periods |
 | `views/channel_quality.py` | Feature 4: volume vs quality quadrants |
 | `views/funnel.py` | Feature 5: 6-step funnel, segments heatmap, product groups |
 | `views/drilldown.py` | Feature 6: channel → source/medium → campaign, month → week → day, product group → product |
-| `views/planned.py` | Placeholders for features 7–10 (scope + data source) |
+| `views/segments.py` | Feature 7: segment profiles against the average, two-dimension matrix |
+| `views/alerts.py` | Feature 8: threshold alerts, latest window vs the one before |
+| `views/scenario.py` | Feature 9: per-channel traffic / conversion what-if |
+| `views/trace.py` | Feature 10: definition, numerator/denominator, lineage, source sessions, warehouse check |
 
 ## Rules
 
@@ -73,9 +76,9 @@ restart the command if a changed module is not reloaded.
 - Ratios are recomputed from numerators/denominators after filtering (`kpi.summarize`);
   never sum or average ratio columns.
 - KPI names, units and formulas shown to users come from `kpi_dictionary.yaml`.
-- To build a feature: put the logic in `analysis/<feature>.py` (no Streamlit), the page in
-  `views/<feature>.py` with `render(ctx)`, register it in `app.py`, remove its entry from
-  `views/planned.PLANNED`, add tests in `tests/test_dashboard_analysis.py`.
+- To change a feature: logic lives in `analysis/<feature>.py` (no Streamlit, unit tested in
+  `tests/test_dashboard_analysis.py`), the page in `views/<feature>.py` with `render(ctx)`,
+  registered in `app.py`. Links between pages go through `ctx.pages[url_path]`.
 
 ## Known data limits
 
@@ -83,9 +86,11 @@ restart the command if a changed module is not reloaded.
   do not apply to product figures.
 - New/returning (`is_new_user_session`) relies on the `first_visit` event; users
   first seen before 2020-11-01 only appear as returning.
-- 01–10/11/2020 have no valid order: every purchase there has transaction_id `(not set)`
-  (883 such purchases over the 92 days, USD 31,817 excluded). `kpi.no_valid_order_note`
-  returns the caption pages show when a range touches those days.
+- Two data gaps make orders and revenue fall for data reasons: 01–10/11/2020 (every
+  purchase has transaction_id `(not set)`) and 26–31/01/2021 (232 of 282 purchases lack a
+  transaction_id and the source revenue nearly stops). 883 purchases with `(not set)` (USD
+  31,817) are excluded over the 92 days. `kpi.data_gap_note` returns the caption pages show
+  when a range touches a gap.
 - In the obfuscated data the items viewed/added to cart and the items purchased are almost
   disjoint catalogues (4 of 427 viewed item_ids were sold), so the funnel has no
   per-product view → purchase rate.
