@@ -19,6 +19,9 @@ pyyaml
 # Layer 5 — Dashboard
 streamlit             # or use Power BI (then drop this line)
 plotly
+db-dtypes             # BigQuery DATE columns -> pandas (dashboard bigquery mode)
+google-cloud-bigquery-storage  # fast Arrow download: 360k sessions in ~9s instead of ~160s
+pyarrow
 
 # Testing
 pytest

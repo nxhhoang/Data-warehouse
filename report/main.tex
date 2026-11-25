@@ -241,35 +241,24 @@
 % Member list
 \section*{Danh sách thành viên \& phân công}
 \addcontentsline{toc}{section}{Danh sách thành viên \& phân công}
-\begin{center}
-  \begin{table}[h]
-    \centering
-    \begin{tabular}{|c|c|c|l|c|}
-      \hline
-      \textbf{STT}       & \textbf{Họ và tên}                & \textbf{MSSV}            & \textbf{Phân công} & \textbf{\% hoàn thành} \\
-      \hline
-      %%%%%Student 1%%%%%%%%%%
-      \multirow{3}{*}{1} & \multirow{3}{*}{Bùi Trọng Hiển}    & \multirow{3}{*}{2310993} &
-      - placeholder  & \multirow{3}{*}{100\%}                                                                                     \\
-      &                                   &                          & - ...       &                        \\
-      &                                   &                          & - ...  &                        \\
-      \hline
-      %%%%%Student 2%%%%%%%%%%%
-      \multirow{2}{*}{2} & \multirow{2}{*}{Nguyễn Xuân Huy Hoàng}  & \multirow{2}{*}{2311070} &
-      - placeholder  & \multirow{2}{*}{100\%}  \\
-      &    &   & - placeholder &   \\
-      \hline
-      %%%%%Student 3%%%%%%%%%%% 
-      \multirow{3}{*}{3} & \multirow{3}{*}{Trần Vĩnh Dũng} & \multirow{3}{*}{2310574} &
-      - placeholder & \multirow{3}{*}{100\%}                                                                                     \\
-      &                                   &                          & - ...       &                        \\
-      &                                   &                          & - ...           &                        \\
-      \hline
-      
-    \end{tabular}
-    \caption{\label{table1}Danh sách thành viên \& phân công}
-  \end{table}
-\end{center}
+\begin{table}[H]
+  \centering
+  \begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{0.8cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}p{1.8cm}|X|}
+    \hline
+    \textbf{STT} & \textbf{Họ và tên} & \textbf{MSSV} & \textbf{Phạm vi phụ trách theo phân công} \\
+    \hline
+    1 & Bùi Trọng Hiển & 2310993 & Application Developer: phát triển các tính năng DSS, kiểm thử tổng thể và biên tập demo. \\
+    \hline
+    2 & Nguyễn Xuân Huy Hoàng & 2311070 & Data Warehouse \& KPI Engineer: mô hình kho, tầng KPI và tích hợp hệ thống. \\
+    \hline
+    3 & Trần Vĩnh Dũng & 2310574 & Data Engineer: thu thập, biến đổi, chất lượng dữ liệu và hỗ trợ dashboard. \\
+    \hline
+  \end{xltabular}
+  % \caption{Danh sách thành viên và phạm vi phụ trách}
+  \label{tab:team-summary}
+\end{table}
+
+Phụ lục 1 trình bày chi tiết vai trò và bằng chứng cộng tác qua các branch, commit và loại sản phẩm liên quan.
 
 \pagebreak
 
@@ -291,7 +280,7 @@
 \pagebreak
 \input{text/hien-thuc.tex}
 \pagebreak
-\input{text/ke-hoach-thuc-hien.tex}
+\input{text/danh-gia.tex}
 \pagebreak
 \input{text/ket-luan.tex}
 
@@ -300,6 +289,49 @@
 \nocite{*}
 \printbibliography[
   heading=bibintoc,
-  title={Tài liệu tham khảo}
+  title={References}
 ]
+
+\pagebreak
+\section*{Appendix 1. Teamwork report}
+\addcontentsline{toc}{section}{Appendix 1. Teamwork report}
+\label{sec:teamwork-report}
+
+Phụ lục này phản ánh vai trò thống nhất trong tài liệu phân công của nhóm và minh chứng cộng tác trên repository. Số commit hay số dòng mã không được dùng để suy diễn tỷ lệ lao động hay mức độ hoàn thành cá nhân.
+
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}X|}
+\caption{Phạm vi phụ trách và minh chứng thực hiện}
+\label{tab:teamwork-evidence} \\
+\hline
+\textbf{Thành viên} & \textbf{Vai trò và phạm vi} & \textbf{Minh chứng triển khai/cộng tác} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Thành viên} & \textbf{Vai trò và phạm vi} & \textbf{Minh chứng triển khai/cộng tác} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+
+Bùi Trọng Hiển (2310993)
+& Application Developer. Phát triển các tính năng DSS, kiểm thử tổng thể và biên tập demo.
+& Branch \texttt{hien/warehouse-dashboard-fields} và \texttt{hien/dashboard}. Các commit \texttt{c54ef39} về trường người dùng mới/quay lại và mart theo kênh/thiết bị; \texttt{d8d5921} về dựng warehouse trên BigQuery Sandbox. Các commit \texttt{d7f6fc5}, \texttt{46accab}, \texttt{fad0b26}, \texttt{b825b1c}, \texttt{03ed918} lần lượt phát triển và kiểm thử drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. \\
+
+Nguyễn Xuân Huy Hoàng (2311070)
+& Data Warehouse \& KPI Engineer. Mô hình kho, tầng KPI, tích hợp pipeline và hạ tầng triển khai.
+& Merge \texttt{f30c272} và \texttt{537924d} để tích hợp các nhánh warehouse/dashboard. Commit \texttt{da06b54} kiểm thử Publisher -- Emulator -- DirectRunner và \texttt{ef86de1} kiểm thử Sandbox cùng đóng gói Docker. Các công việc vận hành liên quan quota, quản lý PID, cấu hình môi trường và tài liệu chạy hệ thống. \\
+
+Trần Vĩnh Dũng (2310574)
+& Data Engineer. Biến đổi dữ liệu, thông tin phiên và sản phẩm, hỗ trợ pipeline, chất lượng dữ liệu và dashboard.
+& Phạm vi nghiệp vụ/dashboard được tổ chức qua các trang tổng quan, so sánh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Quá trình nghiệm thu và trình bày demo được thực hiện theo phối hợp chung của nhóm. \\
+\end{xltabular}
+
+\subsection*{Cách phối hợp}
+
+Nhóm phân chia công việc theo các branch riêng trên GitHub rồi hợp nhất vào \texttt{hoang/warehouse}. Các merge được sử dụng để đưa phần mô hình, khóa và dashboard về cùng một code path thay vì duy trì nhiều bản sao tách biệt. Sau tích hợp, Publisher, DirectRunner, dbt và dashboard được kiểm thử trên cùng một batch dữ liệu. Các thành viên hỗ trợ chéo giữa xử lý dữ liệu, warehouse, dashboard và tài liệu triển khai.
+
+Sản phẩm tài liệu và trình bày được xây dựng dựa trên kết quả kiểm thử thực tế. Bằng chứng trực tiếp trong repo gồm test pipeline cục bộ, log dbt, kiểm tra KPI view, báo cáo sử dụng BigQuery và replay Docker. Khi trình bày, mỗi phần cần chỉ rõ đâu là dữ liệu toàn kỳ được phân tích, đâu là mẫu validation 100 event, và đâu là phần mở rộng chưa vận hành để người xem không hiểu nhầm phạm vi hoàn thành.
+
 \end{document}

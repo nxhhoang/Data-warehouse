@@ -6,34 +6,35 @@ bytes scanned, and whether each Marts/KPI query meets the 3-second target.
 Results are saved to tests/benchmark_results.json.
 """
 
-import os
-import time
+import argparse
+from datetime import datetime
 import json
+import os
 from pathlib import Path
+import sys
+import time
 from google.cloud import bigquery
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.extract.bigquery_usage import prepare_query, record_job  # noqa: E402
+from src.extract.publisher import load_env_file, to_yyyymmdd  # noqa: E402
 
 
-def load_env_file(path: Path = REPO_ROOT / ".env") -> None:
-    """Load key/value pairs from a .env file if it exists; never overwrite."""
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip())
-
-
-def run_benchmark(project_id: str) -> list[dict]:
+def run_benchmark(project_id: str, start_date: str | None = None,
+                  end_date: str | None = None) -> list[dict]:
     """Run all benchmark queries and collect timing results.
 
     Parameters
     ----------
     project_id : str
         GCP project that owns the kpi, marts and core datasets.
+    start_date : str, optional
+        First raw date as YYYYMMDD or YYYY-MM-DD. Defaults to .env.
+    end_date : str, optional
+        Last raw date as YYYYMMDD or YYYY-MM-DD. Defaults to .env.
 
     Returns
     -------
@@ -42,6 +43,21 @@ def run_benchmark(project_id: str) -> list[dict]:
         'latency_sec', 'bytes_processed', 'mb_processed' and 'status'
         (PASS / FAIL for Marts/KPI queries under 3 s, BASELINE for raw).
     """
+    source_dataset = os.environ.get(
+        "BQ_SOURCE_DATASET", "bigquery-public-data.ga4_obfuscated_sample_ecommerce")
+    start_date = to_yyyymmdd(start_date or os.environ.get(
+        "EXTRACT_START_DATE", "2020-11-01"))
+    end_date = to_yyyymmdd(end_date or os.environ.get(
+        "EXTRACT_END_DATE", start_date))
+    for value in (start_date, end_date):
+        datetime.strptime(value, "%Y%m%d")
+    if start_date > end_date:
+        raise ValueError("Benchmark start_date must not be after end_date")
+    print(f"Benchmark range: {start_date} -> {end_date}; source={source_dataset}")
+    raw_params = [
+        bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+        bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+    ]
     client = bigquery.Client(project=project_id)
 
     queries = [
@@ -57,7 +73,7 @@ def run_benchmark(project_id: str) -> list[dict]:
                         ecommerce.transaction_id AS transaction_id,
                         ecommerce.purchase_revenue_in_usd AS revenue_usd
                     FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
-                    WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+                    WHERE _TABLE_SUFFIX BETWEEN @start_date AND @end_date
                       AND event_name = 'purchase'
                       AND ecommerce.transaction_id IS NOT NULL
                       AND TRIM(ecommerce.transaction_id) NOT IN ('(not set)', '<Other>', '(data deleted)', '')
@@ -74,7 +90,7 @@ def run_benchmark(project_id: str) -> list[dict]:
                     )) AS sessions,
                     (SELECT SUM(revenue_usd) FROM valid_orders) AS revenue
                 FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` e
-                WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+                WHERE _TABLE_SUFFIX BETWEEN @start_date AND @end_date
                 GROUP BY e.event_date
             """,
         },
@@ -140,15 +156,25 @@ def run_benchmark(project_id: str) -> list[dict]:
     ]
 
     results = []
-    job_config = bigquery.QueryJobConfig(use_query_cache=False)
+    max_query_bytes = int(os.environ.get(
+        "BQ_MAX_QUERY_BYTES", str(128 * 1024**2)))
+    usage_log = os.environ.get("BQ_USAGE_LOG", "build/bigquery_usage.jsonl")
+    queries[0]["sql"] = queries[0]["sql"].replace(
+        "bigquery-public-data.ga4_obfuscated_sample_ecommerce", source_dataset)
 
     print(f"{'Query':<34} | {'Layer':<18} | {'Latency (s)':<12} | {'Bytes Scanned':<15} | {'M5 (<3s)'}")
     print("-" * 96)
 
     for q in queries:
+        job = prepare_query(
+            client, q["sql"], raw_params if q["layer"] == "Raw (events_*)" else None,
+            max_query_bytes, f"benchmark_{q['name']}", usage_log,
+            use_query_cache=False)
         t0 = time.perf_counter()
-        job = client.query(q["sql"], job_config=job_config)
-        _ = list(job.result())
+        try:
+            _ = list(job.result())
+        finally:
+            record_job(job, f"benchmark_{q['name']}", usage_log)
         elapsed = round(time.perf_counter() - t0, 3)
         bytes_proc = job.total_bytes_processed or 0
         passed = "PASS" if (q["layer"] != "Raw (events_*)" and elapsed < 3.0) else ("BASELINE" if q["layer"] == "Raw (events_*)" else "FAIL")
@@ -169,8 +195,12 @@ def run_benchmark(project_id: str) -> list[dict]:
 
 if __name__ == "__main__":
     load_env_file()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--start-date", help="YYYYMMDD or YYYY-MM-DD; defaults to .env")
+    parser.add_argument("--end-date", help="YYYYMMDD or YYYY-MM-DD; defaults to .env")
+    args = parser.parse_args()
     PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "your-gcp-project-id")
-    out = run_benchmark(PROJECT_ID)
+    out = run_benchmark(PROJECT_ID, args.start_date, args.end_date)
     out_path = Path(__file__).resolve().parent / "benchmark_results.json"
     out_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nSaved benchmark report to {out_path}")

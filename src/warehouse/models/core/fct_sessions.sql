@@ -5,8 +5,10 @@ WITH events_with_keys AS (
         e.event_date,
         e.date_key,
         e.event_timestamp,
+        e.event_ts_utc,
         e.event_bundle_sequence_id,
         e.event_name,
+        e.ga_session_number,
         e.engaged_session_event,
         e.session_engaged,
         e.engagement_time_msec,
@@ -51,6 +53,7 @@ session_first_attrs AS (
         session_id,
         -- Cross-midnight session rule (0.23%): take the date of the first event in the session
         FIRST_VALUE(date_key) OVER w_asc AS date_key,
+        FIRST_VALUE(event_ts_utc) OVER w_asc AS session_start_ts,
         FIRST_VALUE(user_key) OVER w_asc AS user_key,
         FIRST_VALUE(user_source_key) OVER w_asc AS user_source_key,
         FIRST_VALUE(device_key) OVER w_asc AS device_key,
@@ -62,11 +65,12 @@ session_first_attrs AS (
             ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
         ) AS first_session_source_key
     FROM events_with_keys
+    -- BigQuery clause order: QUALIFY must come before WINDOW
+    QUALIFY ROW_NUMBER() OVER w_asc = 1
     WINDOW w_asc AS (
         PARTITION BY session_id
         ORDER BY event_timestamp ASC, event_bundle_sequence_id ASC
     )
-    QUALIFY ROW_NUMBER() OVER w_asc = 1
 ),
 session_metrics AS (
     SELECT
@@ -76,6 +80,12 @@ session_metrics AS (
         COUNTIF(event_name = 'view_item') AS view_item_count,
         SUM(engagement_time_msec) AS engagement_time_msec,
         MAX(CASE WHEN session_engaged = '1' OR engaged_session_event = 1 THEN 1 ELSE 0 END) AS is_engaged,
+        -- New-user session = the session holding the user's first_visit (same rule as
+        -- the new_user_rate KPI); every later session of that user counts as returning
+        MAX(CASE WHEN event_name = 'first_visit' THEN 1 ELSE 0 END) AS is_new_user_session,
+        -- GA4's own per-user session counter (survey 07: present on 100% of events);
+        -- unlike a ROW_NUMBER over our window it also counts sessions before 2020-11-01
+        MAX(ga_session_number) AS user_session_number,
         MAX(CASE WHEN event_name = 'view_item' THEN 1 ELSE 0 END) AS has_view_item,
         MAX(CASE WHEN event_name = 'add_to_cart' THEN 1 ELSE 0 END) AS has_add_to_cart,
         MAX(CASE WHEN event_name = 'begin_checkout' THEN 1 ELSE 0 END) AS has_begin_checkout,
@@ -94,32 +104,35 @@ session_orders AS (
     GROUP BY session_id
 )
 SELECT
-    fa.session_id,
-    COALESCE(fa.date_key, -1) AS date_key,
-    COALESCE(fa.user_key, -1) AS user_key,
-    COALESCE(fa.device_key, -1) AS device_key,
-    COALESCE(fa.geo_key, -1) AS geo_key,
-    COALESCE(fa.landing_page_key, -1) AS landing_page_key,
+    fa.session_id, -- STRING
+    COALESCE(fa.date_key, -1) AS date_key, -- INT64
+    COALESCE(fa.user_key, -1) AS user_key, -- INT64
+    COALESCE(fa.device_key, -1) AS device_key, -- INT64
+    COALESCE(fa.geo_key, -1) AS geo_key, -- INT64
+    COALESCE(fa.landing_page_key, -1) AS landing_page_key, -- INT64
     -- 2-tier source attribution: prioritize session-level source, otherwise fallback to user-level source
-    COALESCE(fa.first_session_source_key, fa.user_source_key, -1) AS session_source_key,
-    COALESCE(fa.user_source_key, -1) AS user_source_key,
+    COALESCE(fa.first_session_source_key, fa.user_source_key, -1) AS session_source_key, -- INT64
+    COALESCE(fa.user_source_key, -1) AS user_source_key, -- INT64
     CASE
         WHEN fa.first_session_source_key IS NOT NULL THEN 'session'
         ELSE 'user_fallback'
-    END AS attribution_basis,
-    sm.event_count,
-    sm.page_view_count,
-    sm.view_item_count,
-    sm.engagement_time_msec,
-    sm.is_engaged,
-    sm.has_view_item,
-    sm.has_add_to_cart,
-    sm.has_begin_checkout,
-    sm.has_add_shipping_info,
-    sm.has_add_payment_info,
-    CASE WHEN COALESCE(so.order_count, 0) > 0 THEN 1 ELSE 0 END AS has_purchase,
-    COALESCE(so.order_count, 0) AS order_count,
-    COALESCE(so.revenue_usd, 0.0) AS revenue_usd
+    END AS attribution_basis, -- STRING: session or user_fallback
+    fa.session_start_ts, -- TIMESTAMP
+    sm.is_new_user_session, -- INT64: 0 or 1
+    COALESCE(sm.user_session_number, -1) AS user_session_number, -- INT64
+    sm.event_count, -- INT64
+    sm.page_view_count, -- INT64
+    sm.view_item_count, -- INT64
+    sm.engagement_time_msec, -- INT64: milliseconds
+    sm.is_engaged, -- INT64: 0 or 1
+    sm.has_view_item, -- INT64: 0 or 1
+    sm.has_add_to_cart, -- INT64: 0 or 1
+    sm.has_begin_checkout, -- INT64: 0 or 1
+    sm.has_add_shipping_info, -- INT64: 0 or 1
+    sm.has_add_payment_info, -- INT64: 0 or 1
+    CASE WHEN COALESCE(so.order_count, 0) > 0 THEN 1 ELSE 0 END AS has_purchase, -- INT64: 0 or 1
+    COALESCE(so.order_count, 0) AS order_count, -- INT64
+    COALESCE(so.revenue_usd, 0.0) AS revenue_usd -- FLOAT64: US dollars
 FROM session_first_attrs fa
 JOIN session_metrics sm ON fa.session_id = sm.session_id
 LEFT JOIN session_orders so ON fa.session_id = so.session_id

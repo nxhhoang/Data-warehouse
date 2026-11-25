@@ -1,283 +1,275 @@
-% Preamble cần có: \usepackage{tabularx}  \usepackage{array}
-
 \section{Thiết kế mô hình chiều}
 \label{sec:dimensional-model}
 
-Mô hình dữ liệu theo phương pháp Kimball, xây dựng bằng bốn bước: chọn quy trình nghiệp vụ, khai báo grain, chọn dimension và xác định measure. Quy trình nghiệp vụ được chọn là \textbf{hành vi truy cập và mua hàng trên website thương mại điện tử}. Lược đồ gồm bốn bảng fact dùng chung tám bảng dimension (conformed dimensions), tạo thành nhiều lược đồ hình sao trên cùng một bus. dbt xây dựng bảng trong ba schema của BigQuery: staging (view), core (bảng fact và dimension) và marts (bảng tổng hợp).
+Mô hình được thiết kế theo hướng Kimball cho quá trình truy cập và mua hàng trên website thương mại điện tử \parencite{kimball2013}. Quy trình gồm bốn bước: chọn quy trình nghiệp vụ, khai báo grain cho từng bảng fact, chọn dimension và xác định measure. Kho sử dụng \textbf{4 bảng fact và 8 bảng dimension dùng chung}, được dựng bởi dbt thành các schema \texttt{staging}, \texttt{core} và \texttt{marts}. \medskip
 
-\subsection{Các bảng fact và grain}
+Ba bảng staging (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}, \texttt{stg\_valid\_orders}) là view dùng để chuẩn hóa nguồn, làm phẳng tham số và mặt hàng, khử trùng sự kiện và xác định giao dịch hợp lệ. Các bảng fact và dimension trong \texttt{core} là bảng vật lý. Các bảng trong \texttt{marts} tổng hợp số đo theo grain phục vụ báo cáo, còn ba KPI view tính tỷ lệ từ cùng một tập tử số và mẫu số.
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}X}
-\caption{Các bảng fact và grain}
+\subsection{Grain của bốn bảng fact}
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
+\caption{Bốn bảng fact và grain tương ứng}
 \label{tab:fact-grain} \\
-
 \hline
-\textbf{Bảng fact} & \textbf{Grain (1 dòng là)} & \textbf{Mục đích} \\
+\textbf{Bảng fact} & \textbf{Một dòng đại diện cho} & \textbf{Nội dung chính} \\
 \hline
 \endfirsthead
-
-% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
 \hline
-\textbf{Bảng fact} & \textbf{Grain (1 dòng là)} & \textbf{Mục đích} \\
+\textbf{Bảng fact} & \textbf{Một dòng đại diện cho} & \textbf{Nội dung chính} \\
 \hline
 \endhead
-
 \hline
-\multicolumn{3}{r}{{Còn tiếp}} \\
 \endfoot
-
 \hline
 \endlastfoot
 
 \texttt{fct\_events}
-& Một sự kiện GA4 sau khi loại trùng
-& Đếm sự kiện, lượt xem trang, thời gian tương tác; phân tích chuỗi hành vi \\
+& Một sự kiện GA4 sau khử trùng
+& Mã sự kiện, thời điểm, liên kết người dùng/thiết bị/trang/nguồn và thời gian tương tác. \\
 
 \texttt{fct\_sessions}
-& Một phiên (\texttt{user\_pseudo\_id}, \texttt{ga\_session\_id})
-& KPI theo phiên: phễu, chuyển đổi, doanh thu/phiên, chất lượng kênh \\
+& Một phiên của một cặp (\texttt{user\_pseudo\_id}, \texttt{ga\_session\_id})
+& Thuộc tính đầu phiên, số sự kiện, sáu bước phễu, giao dịch hợp lệ và doanh thu. Phiên có sự kiện qua hai ngày được gán ngày theo sự kiện đầu tiên. \\
 
 \texttt{fct\_purchase\_items}
-& Một mặt hàng trong một giao dịch hợp lệ
-& Doanh thu và số lượng theo sản phẩm, danh mục \\
+& Một vị trí mặt hàng (\texttt{item\_pos}) trong một giao dịch hợp lệ
+& Số lượng, đơn giá và doanh thu của mặt hàng, kèm các khóa liên kết đến sự kiện, phiên và sản phẩm. \\
 
 \texttt{fct\_item\_events}
-& Một mặt hàng trong một sự kiện \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart} hoặc \texttt{begin\_checkout}
-& Phễu theo sản phẩm (lượt xem mặt hàng, thêm giỏ) \\
-
+& Một mặt hàng trong \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart} hoặc \texttt{begin\_checkout}
+& Phễu cấp mặt hàng cho bốn loại sự kiện trên. Hai bước điền thông tin giao hàng/thanh toán không phân tích ở cấp mặt hàng này. \\
 \end{xltabular}
 
-Thuật ngữ \textbf{giao dịch hợp lệ} dùng trong grain của \texttt{fct\_purchase\_items} và cờ \texttt{has\_purchase} của \texttt{fct\_sessions} được định nghĩa ở mục 3.4: là sự kiện \texttt{purchase} có \texttt{transaction\_id} khác rỗng và không thuộc giá trị giữ chỗ, có doanh thu lớn hơn 0, và sau khi khử trùng theo cặp (\texttt{user\_pseudo\_id}, \texttt{transaction\_id}) chỉ giữ sự kiện sớm nhất. Định nghĩa này được cài đặt duy nhất ở mô hình staging \texttt{stg\_valid\_orders} và kế thừa xuống toàn bộ tầng lõi và tầng tổng hợp. \medskip
+\subsection{Chi tiết bốn bảng fact}
 
-Phễu cấp phiên gồm sáu bước (\texttt{view\_item} $\rightarrow$ \texttt{add\_to\_cart} $\rightarrow$ \texttt{begin\_checkout} $\rightarrow$ \texttt{add\_shipping\_info} $\rightarrow$ \texttt{add\_payment\_info} $\rightarrow$ mua hàng), tương ứng \texttt{funnel\_step} 1--6 trong \texttt{dim\_event}; các cờ \texttt{has\_*} của \texttt{fct\_sessions} đánh dấu phiên đạt từng bước. Ở cấp mặt hàng, \texttt{fct\_item\_events} chỉ giữ bốn loại sự kiện \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart} và \texttt{begin\_checkout}, vì hai bước trung gian của quá trình thanh toán không phân tích theo sản phẩm.
-
-
-
-
-\subsection{Chi tiết bảng fact}
-
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
-\caption{Cấu trúc \texttt{fct\_events}}
-\label{tab:fct-events} \\
-
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X}
+\caption{Dữ liệu trong \texttt{fct\_events}}
+\label{tab:fct-events-detail} \\
 \hline
-\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\textbf{Nhóm cột} & \textbf{Kiểu} & \textbf{Ý nghĩa} \\
 \hline
 \endfirsthead
-
-% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
 \hline
-\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\textbf{Nhóm cột} & \textbf{Kiểu} & \textbf{Ý nghĩa} \\
 \hline
 \endhead
-
 \hline
-\multicolumn{3}{r}{{Còn tiếp}} \\
 \endfoot
-
 \hline
 \endlastfoot
 
-\texttt{event\_id} & Khóa chính & Mã băm từ \texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name}, \texttt{event\_bundle\_sequence\_id} \\
+\texttt{event\_id}
+& \texttt{INT64}
+& Khóa của một sự kiện sau khi loại trùng, sinh từ \texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name} và \texttt{event\_bundle\_sequence\_id}. \\
 
-\texttt{date\_key} & FK $\rightarrow$ \texttt{dim\_date} & Ngày sự kiện \\
+\texttt{date\_key}, \texttt{event\_key}, \texttt{user\_key}, \texttt{device\_key}, \texttt{geo\_key}, \texttt{page\_key}, \texttt{traffic\_source\_key}
+& \texttt{INT64}
+& Khóa liên kết đến ngày, loại sự kiện, người dùng, thiết bị, địa lý, trang và nguồn của phiên. Nguồn phiên được ưu tiên; khi không có nguồn phiên thì dùng nguồn cấp người dùng. \\
 
-\texttt{event\_key} & FK $\rightarrow$ \texttt{dim\_event} & Loại sự kiện \\
+\texttt{session\_id}
+& \texttt{STRING}
+& Khóa dẫn về \texttt{fct\_sessions}; đây là degenerate dimension, không phải dimension vật lý riêng. \\
 
-\texttt{user\_key} & FK $\rightarrow$ \texttt{dim\_user} & Người dùng \\
+\texttt{event\_date}
+& \texttt{DATE}
+& Ngày của sự kiện. \\
 
-\texttt{device\_key} & FK $\rightarrow$ \texttt{dim\_device} & Thiết bị tại thời điểm sự kiện \\
+\texttt{event\_timestamp}
+& \texttt{INT64}
+& Thời điểm của sự kiện, tính bằng micro giây kể từ epoch UTC. \\
 
-\texttt{geo\_key} & FK $\rightarrow$ \texttt{dim\_geo} & Địa lý tại thời điểm sự kiện \\
+\texttt{event\_ts\_utc}
+& \texttt{TIMESTAMP}
+& Dạng timestamp của \texttt{event\_timestamp}, phục vụ sắp xếp và phân tích theo thời gian. \\
 
-\texttt{page\_key} & FK $\rightarrow$ \texttt{dim\_page} & Trang phát sinh sự kiện \\
-
-\texttt{traffic\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp phiên của phiên chứa sự kiện; nếu phiên chưa từng có nguồn thì dùng nguồn cấp người dùng \\
-
-\texttt{session\_id} & Degenerate dimension & Nối sang \texttt{fct\_sessions} \\
-
-\texttt{event\_timestamp} & Thuộc tính & Thời điểm UTC; cột phân vùng theo ngày \\
-
-\texttt{engagement\_time\_msec} & Measure (cộng được) & Thời gian tương tác của sự kiện \\
-
+\texttt{engagement\_time\_msec}
+& \texttt{INT64}
+& Thời gian tương tác của sự kiện, theo mili giây; có thể cộng dồn theo grain. \\
 \end{xltabular}
 
-\renewcommand{\arraystretch}{1.4}
-
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
-\caption{Cấu trúc \texttt{fct\_sessions}}
-\label{tab:fct-sessions} \\
-
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.5cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X}
+\caption{Dữ liệu trong \texttt{fct\_sessions}}
+\label{tab:fct-sessions-detail} \\
 \hline
-\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\textbf{Nhóm cột} & \textbf{Kiểu} & \textbf{Ý nghĩa} \\
 \hline
 \endfirsthead
-
-% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
 \hline
-\textbf{Cột} & \textbf{Loại} & \textbf{Mô tả} \\
+\textbf{Nhóm cột} & \textbf{Kiểu} & \textbf{Ý nghĩa} \\
 \hline
 \endhead
-
 \hline
-\multicolumn{3}{r}{{Còn tiếp}} \\
 \endfoot
-
 \hline
 \endlastfoot
 
-\texttt{session\_id} & Khóa chính & Ghép \texttt{user\_pseudo\_id} và \texttt{ga\_session\_id} \\
+\texttt{session\_id}
+& \texttt{STRING}
+& Ghép \texttt{user\_pseudo\_id} với \texttt{ga\_session\_id}. Các sự kiện không có định danh phiên không được đưa vào bảng này. \\
 
-\texttt{date\_key} & FK $\rightarrow$ \texttt{dim\_date} & Ngày của sự kiện đầu tiên trong phiên \\
+\texttt{date\_key}, \texttt{user\_key}, \texttt{device\_key}, \texttt{geo\_key}
+& \texttt{INT64}
+& Ngày và các thuộc tính tại sự kiện đầu tiên của phiên: người dùng, thiết bị và địa lý. \\
 
-\texttt{user\_key} & FK $\rightarrow$ \texttt{dim\_user} & Người dùng \\
+\texttt{landing\_page\_key}
+& \texttt{INT64}
+& Trang của sự kiện đầu tiên trong phiên. \\
 
-\texttt{device\_key}, \texttt{geo\_key} & FK & Thiết bị và địa lý tại sự kiện đầu tiên của phiên \\
+\texttt{session\_source\_key}
+& \texttt{INT64}
+& Nguồn đầu tiên có xác định được trong phiên. Nếu mọi sự kiện đều thiếu nguồn thì dùng \texttt{user\_source\_key}. \\
 
-\texttt{landing\_page\_key} & FK $\rightarrow$ \texttt{dim\_page} & Trang vào đầu tiên \\
+\texttt{user\_source\_key}
+& \texttt{INT64}
+& Khóa nguồn cấp người dùng dựa trên sự kiện đầu tiên của người đó trong kỳ dữ liệu. Cùng \texttt{dim\_traffic\_source} được dùng ở hai vai trò riêng. \\
 
-\texttt{session\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp phiên (vai trò 1) \\
+\texttt{attribution\_basis}
+& \texttt{STRING}
+& Giá trị \texttt{session} khi gán được nguồn theo phiên, \texttt{user\_fallback} khi phải dùng nguồn cấp người dùng. \\
 
-\texttt{user\_source\_key} & FK $\rightarrow$ \texttt{dim\_traffic\_source} & Nguồn cấp người dùng (vai trò 2) \\
+\texttt{session\_start\_ts}
+& \texttt{TIMESTAMP}
+& Thời điểm của sự kiện đầu tiên trong phiên. \\
 
-\texttt{attribution\_basis} & Thuộc tính & \texttt{session} hoặc \texttt{user\_fallback}: cơ sở quy kết đã dùng \\
+\texttt{is\_new\_user\_session}
+& \texttt{INT64}, giá trị 0/1
+& Cờ cho biết phiên chứa \texttt{first\_visit}; các phiên sau của cùng người dùng được xem là quay lại. \\
 
-\texttt{event\_count}, \texttt{page\_view\_count}, \texttt{view\_item\_count} & Measure (cộng được) & Số sự kiện, lượt xem trang, lượt xem sản phẩm \\
+\texttt{user\_session\_number}
+& \texttt{INT64}
+& Số thứ tự phiên \texttt{ga\_session\_number} do GA4 cung cấp, có thể tính cả những phiên trước khoảng dữ liệu đang phân tích. Nếu thiếu dùng $-1$. \\
 
-\texttt{engagement\_time\_msec} & Measure (cộng được) & Tổng thời gian tương tác \\
+\texttt{event\_count}, \texttt{page\_view\_count}, \texttt{view\_item\_count}, \texttt{engagement\_time\_msec}
+& \texttt{INT64}
+& Số sự kiện, lượt xem trang, lượt xem sản phẩm và thời gian tương tác của từng phiên. \\
 
-\texttt{is\_engaged}, \texttt{has\_view\_item}, \texttt{has\_add\_to\_cart}, \texttt{has\_begin\_checkout}, \texttt{has\_add\_shipping\_info}, \texttt{has\_add\_payment\_info}, \texttt{has\_purchase} & Cờ 0/1 (cộng được) & Phiên có tương tác, đạt từng bước phễu sáu bước; \texttt{has\_purchase} chỉ tính giao dịch hợp lệ \\
+\texttt{is\_engaged}, \texttt{has\_view\_item}, \texttt{has\_add\_to\_cart}, \texttt{has\_begin\_checkout}, \texttt{has\_add\_shipping\_info}, \texttt{has\_add\_payment\_info}, \texttt{has\_purchase}
+& \texttt{INT64}, giá trị 0/1
+& Cờ phiên có tương tác và sáu bước phễu: xem mặt hàng, thêm giỏ, bắt đầu thanh toán, điền giao hàng, điền thanh toán, mua hàng. \texttt{has\_purchase} chỉ ghi nhận giao dịch hợp lệ. \\
 
-\texttt{order\_count}, \texttt{revenue\_usd} & Measure (cộng được) & Số đơn và doanh thu của giao dịch hợp lệ \\
+\texttt{order\_count}
+& \texttt{INT64}
+& Số mã giao dịch phân biệt hợp lệ trong phiên. \\
 
+\texttt{revenue\_usd}
+& \texttt{FLOAT64}
+& Tổng doanh thu giao dịch hợp lệ theo USD của phiên. \\
 \end{xltabular}
 
-
-
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}X}
-\caption{Cấu trúc \texttt{fct\_purchase\_items} và \texttt{fct\_item\_events}}
-\label{tab:fct-purchase-item-events}
-
-\small
-\renewcommand{\arraystretch}{1.25}
-
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}X}
+\caption{Dữ liệu chi tiết của hai fact cấp mặt hàng}
+\label{tab:fct-item-details} \\
 \hline
-\textbf{Thành phần} & \textbf{\texttt{fct\_purchase\_items}} & \textbf{\texttt{fct\_item\_events}} & \textbf{Ghi chú} \\
+\textbf{Nhóm cột} & \textbf{Bảng} & \textbf{Ý nghĩa} \\
 \hline
 \endfirsthead
-
-% \multicolumn{4}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
 \hline
-\textbf{Thành phần} & \textbf{\texttt{fct\_purchase\_items}} & \textbf{\texttt{fct\_item\_events}} & \textbf{Ghi chú} \\
+\textbf{Nhóm cột} & \textbf{Bảng} & \textbf{Ý nghĩa} \\
 \hline
 \endhead
-
 \hline
-\multicolumn{4}{r}{{Còn tiếp}} \\
 \endfoot
-
 \hline
 \endlastfoot
 
-Khóa chính
-& \texttt{purchase\_item\_id}
-& \texttt{item\_event\_id}
-& Mã băm của sự kiện và vị trí mặt hàng \\
+\texttt{purchase\_item\_id}
+& \texttt{fct\_purchase\_items}
+& Khóa \texttt{INT64} từ \texttt{event\_id} và \texttt{item\_pos}; mỗi dòng là một vị trí item trong giao dịch. \\
 
-Khóa ngoại dùng chung
-& \multicolumn{2}{p{6.2cm}}{\texttt{date\_key}, \texttt{user\_key}, \texttt{device\_key}, \texttt{geo\_key}, \texttt{traffic\_source\_key} (nguồn cấp phiên), \texttt{product\_key}}
-& Cả hai bảng \\
+\texttt{item\_event\_id}
+& \texttt{fct\_item\_events}
+& Cùng nguyên tắc tạo khóa, nhưng dành cho sự kiện tương tác với mặt hàng. \\
 
-Khóa ngoại riêng
-& ---
-& \texttt{event\_key}
-& Phân biệt \texttt{view\_item}, \texttt{add\_to\_cart}, \ldots \\
+\texttt{date\_key}, \texttt{user\_key}, \texttt{device\_key}, \texttt{geo\_key}, \texttt{traffic\_source\_key}, \texttt{product\_key}
+& Cả hai
+& Các khóa \texttt{INT64} nối về dimension tương ứng. Nguồn được gán từ phiên chứa sự kiện item. \\
 
-Degenerate dimension
-& \texttt{session\_id}, \texttt{transaction\_id}
-& \texttt{session\_id}
-& Nối sang \texttt{fct\_sessions} \\
+\texttt{event\_key}
+& \texttt{fct\_item\_events}
+& Khóa \texttt{INT64} phân biệt \texttt{view\_item}, \texttt{select\_item}, \texttt{add\_to\_cart}, \texttt{begin\_checkout}. \\
 
-Measure
-& \texttt{quantity}, \texttt{price\_usd}, \texttt{item\_revenue\_usd}
-& \texttt{quantity} (mặc định 1)
-& Doanh thu cấp đơn không lưu lặp ở từng dòng mặt hàng \\
+\texttt{session\_id}
+& Cả hai
+& \texttt{STRING} nối về phiên; giá trị thiếu được thay bằng \texttt{'Unknown'}. \\
 
+\texttt{transaction\_id}
+& \texttt{fct\_purchase\_items}
+& \texttt{STRING} mã giao dịch hợp lệ. \\
+
+\texttt{quantity}
+& Cả hai
+& \texttt{INT64} số lượng mặt hàng; nếu nguồn không cung cấp, giá trị mặc định là 1. \\
+
+\texttt{price\_usd}
+& \texttt{fct\_purchase\_items}
+& \texttt{FLOAT64} đơn giá theo USD, ưu tiên \texttt{price\_in\_usd}, sau đến \texttt{price}, cuối cùng là 0 khi cả hai thiếu. \\
+
+\texttt{item\_revenue\_usd}
+& \texttt{fct\_purchase\_items}
+& \texttt{FLOAT64} doanh thu mặt hàng. Giá trị dương sẵn có được ưu tiên; còn lại tính \texttt{price\_usd $\times$ quantity}. Doanh thu cấp đơn không được nhân đô trên các dòng item của cùng giao dịch. \\
 \end{xltabular}
 
+\subsection{Tám bảng dimension}
 
-
-\subsection{Các bảng dimension}
-
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}X}
-\caption{Các bảng dimension}
-\label{tab:dimensions}
-
-\small
-\renewcommand{\arraystretch}{1.25}
-
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{4.5cm} >{\raggedright\arraybackslash}X}
+\caption{Khóa và thuộc tính của tám dimension}
+\label{tab:dimensions} \\
 \hline
-\textbf{Dimension} & \textbf{Khóa tự nhiên} & \textbf{Thuộc tính chính} \\
+\textbf{Dimension} & \textbf{Business Key và Surrogate Key} & \textbf{Thuộc tính} \\
 \hline
 \endfirsthead
-
-% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
 \hline
-\textbf{Dimension} & \textbf{Khóa tự nhiên} & \textbf{Thuộc tính chính} \\
+\textbf{Dimension} & \textbf{Business Key và Surrogate Key} & \textbf{Thuộc tính} \\
 \hline
 \endhead
-
 \hline
-\multicolumn{3}{r}{{Còn tiếp}} \\
 \endfoot
-
 \hline
 \endlastfoot
 
 \texttt{dim\_date}
-& \texttt{event\_date}
-& Ngày, thứ, tuần, tháng, quý, cờ cuối tuần, cờ mùa mua sắm cuối năm, cờ \texttt{is\_add\_to\_cart\_tracked} (đánh dấu 18/92 ngày không có sự kiện \texttt{add\_to\_cart}) \\
+& \texttt{full\_date} \texttt{DATE}; \texttt{date\_key} \texttt{INT64} dạng \texttt{YYYYMMDD}
+& Ngày, thứ, tuần, tháng, quý, năm, \texttt{year\_month}. \texttt{is\_weekend} đúng với ngày thứ Bảy/Chủ nhật; \texttt{is\_holiday\_season} đúng từ 25/11 đến 31/12/2020; \texttt{is\_add\_to\_cart\_tracked} đúng khi ngày đó có tối thiểu một \texttt{add\_to\_cart}. \\
 
 \texttt{dim\_event}
-& \texttt{event\_name}
-& Nhóm sự kiện, thứ tự bước phễu (1--6), cờ thuộc phễu, cờ chuyển đổi \\
+& \texttt{event\_name} \texttt{STRING}; \texttt{event\_key} \texttt{INT64}
+& Nhóm \texttt{funnel}, \texttt{engagement}, \texttt{merchandising} hoặc \texttt{other}. \texttt{funnel\_step} từ 1 đến 6 cho sáu sự kiện của phễu và bằng 0 cho các sự kiện khác. Cờ chuyển đổi chỉ đúng với \texttt{purchase}; việc hợp lệ của giao dịch được quyết định riêng ở staging. \\
 
 \texttt{dim\_user}
-& \texttt{user\_pseudo\_id}
-& Ngày tiếp cận đầu tiên, cờ người dùng mới (\texttt{first\_visit}); nguồn cấp người dùng lấy tại sự kiện đầu tiên vì 15,64\% người dùng đổi nguồn trong kỳ \\
+& \texttt{user\_pseudo\_id} \texttt{STRING}; \texttt{user\_key} \texttt{INT64}
+& \texttt{first\_seen\_date}, \texttt{first\_seen\_ts\_utc}, \texttt{is\_new\_user BOOL} dựa trên \texttt{first\_visit}; nguồn, medium và campaign đầu tiên của người dùng, cùng \texttt{user\_traffic\_source\_key}. \\
 
 \texttt{dim\_device}
-& Tổ hợp thuộc tính
-& Loại thiết bị, hệ điều hành, trình duyệt, ngôn ngữ \\
+& Bộ bốn: loại thiết bị, hệ điều hành, trình duyệt, ngôn ngữ; \texttt{device\_key} \texttt{INT64}
+& \texttt{device\_category}, \texttt{operating\_system}, \texttt{browser}, \texttt{language}. Giá trị rỗng, ẩn danh hoặc giữ chỗ được thay bằng \texttt{'Unknown'}. \\
 
 \texttt{dim\_geo}
-& Tổ hợp thuộc tính
-& Châu lục, quốc gia, vùng, thành phố \\
+& Châu lục, quốc gia, vùng, thành phố; \texttt{geo\_key} \texttt{INT64}
+& \texttt{continent}, \texttt{country}, \texttt{region}, \texttt{city}, cùng quy tắc chuẩn hóa giá trị thiếu như thiết bị. \\
 
 \texttt{dim\_page}
-& \texttt{page\_location} đã chuẩn hóa
-& Tên miền, đường dẫn, tiêu đề, loại trang (trang chủ, sản phẩm, giỏ hàng, thanh toán, khác) \\
+& \texttt{page\_location} đã bỏ query/fragment; \texttt{page\_key} \texttt{INT64}
+& Host, đường dẫn, tiêu đề trang và loại trang: \texttt{home}, \texttt{cart}, \texttt{checkout}, \texttt{product}, \texttt{other}. Tiêu đề được chọn gần đúng theo giá trị xuất hiện nhiều nhất của mỗi URL. \\
 
 \texttt{dim\_product}
-& \texttt{item\_id}
-& Tên, thương hiệu, danh mục ba cấp (\texttt{item\_category} $\rightarrow$ \texttt{item\_category2} $\rightarrow$ \texttt{item\_category3}); thuộc tính lấy giá trị phổ biến nhất theo \texttt{item\_id} \\
+& \texttt{item\_id} \texttt{STRING}; \texttt{product\_key} \texttt{INT64}
+& Tên, thương hiệu và ba cấp danh mục. Các thuộc tính được lấy bằng \texttt{APPROX\_TOP\_COUNT}, tức ước lượng giá trị xuất hiện nhiều nhất theo từng \texttt{item\_id}. \\
 
 \texttt{dim\_traffic\_source}
-& (\texttt{source}, \texttt{medium}, \texttt{campaign})
-& Kênh đã gom nhóm theo bộ quy tắc của nhóm; nhóm ``Unknown'' cho \texttt{<Other>} và \texttt{(data deleted)} \\
-
+& Bộ ba \texttt{source}, \texttt{medium}, \texttt{campaign}; \texttt{traffic\_source\_key} \texttt{INT64}
+& Ba thuộc tính nguồn và \texttt{channel\_group}: Direct, Organic Search, Paid Search, Display, Email, Affiliate, Paid Social, Organic Social, Referral. Khi không khớp quy tắc, kênh là \texttt{Unknown} và \texttt{is\_unassigned = TRUE}. \\
 \end{xltabular}
 
-Mỗi dimension dùng khóa thay thế (surrogate key) do dbt sinh ra, kèm một dòng ``Unknown'' (khóa $-1$) để chứa giá trị thiếu hoặc bị ẩn danh. Do đó các khóa ngoại trong bảng fact không bao giờ NULL.
+Trừ \texttt{dim\_date}, các dimension dùng macro \texttt{gen\_sk}: nối các giá trị tự nhiên sau chuẩn hóa rồi tính \texttt{FARM\_FINGERPRINT}, cho kết quả \texttt{INT64}. Giá trị bị thiếu được thay bằng một token trước khi tính khóa. \texttt{dim\_date.date\_key} được tạo trực tiếp từ ngày ở dạng số \texttt{YYYYMMDD}, không qua hàm băm trên. \medskip
 
-\subsection{Ma trận bus}
+Mỗi dimension thêm một dòng dự phòng có khóa $-1$, thường gọi là \texttt{Unknown}. Các khóa ngoại trong fact dùng \texttt{COALESCE} để trỏ về dòng này khi phép nối không tìm thấy giá trị tương ứng. Dòng dự phòng khóa $-1$ khác với một giá trị \texttt{'Unknown'} trong dữ liệu nguồn: giá trị nguồn đó vẫn có thể mang một khóa băm riêng. Ngoài ra, giá trị thuộc tính rỗng được đổi thành \texttt{'Unknown'} không làm thay đổi quy tắc gom kênh nếu \texttt{source/medium} vẫn khớp một kênh đã định nghĩa.
 
 \begin{table}[H]
 \centering
-\caption{Ma trận bus: bảng fact và dimension dùng chung}
+\caption{Ánh xạ dimension dùng chung giữa các fact}
 \label{tab:bus-matrix}
 \footnotesize
-\renewcommand{\arraystretch}{1.3}
+\renewcommand{\arraystretch}{1.25}
 \begin{tabular}{|l|c|c|c|c|c|c|c|c|}
 \hline
 \textbf{Fact} & \textbf{Date} & \textbf{Event} & \textbf{User} & \textbf{Device} & \textbf{Geo} & \textbf{Page} & \textbf{Product} & \textbf{Traffic} \\
@@ -290,50 +282,46 @@ Mỗi dimension dùng khóa thay thế (surrogate key) do dbt sinh ra, kèm mộ
 \end{tabular}
 
 \vspace{0.1cm}
-\scriptsize{Hai dấu $\bullet\bullet$: dimension đóng hai vai trò (nguồn cấp phiên và nguồn cấp người dùng).}
+\scriptsize{$\bullet\bullet$: \texttt{dim\_traffic\_source} đóng hai vai trò, nguồn cấp phiên và nguồn cấp người dùng.}
 \end{table}
 
-\subsection{Bảng tổng hợp và ánh xạ KPI}
+\subsection{Các bảng trong data marts}
 
-Các bảng tổng hợp chỉ lưu tử số và mẫu số cộng được, không lưu tỷ lệ, vì tỷ lệ không cộng dồn được. Số người dùng và số phiên phân biệt cũng không cộng được qua các nhóm, nên chỉ lưu ở đúng mức grain của bảng.
+Marts chỉ lưu các số đếm và số tiền có thể cộng theo grain, không lưu sẵn tỷ lệ để tránh cộng các tỷ lệ không tương thích mẫu. Các tỷ lệ chuyển đổi, AOV, doanh thu trên phiên hoặc trên người dùng được tính từ tử số và mẫu số ở KPI views.
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X}
-\caption{Bảng tổng hợp và nguồn dữ liệu của KPI}
-\label{tab:kpi-source}
-
-\small
-\renewcommand{\arraystretch}{1.25}
-
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.7cm} >{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X}
+\caption{Grain và nội dung của bốn bảng marts}
+\label{tab:marts-detail} \\
 \hline
-\textbf{Bảng tổng hợp} & \textbf{Grain} & \textbf{Nguồn và KPI phục vụ} \\
+\textbf{Bảng mart} & \textbf{Grain} & \textbf{Trường số đo} \\
 \hline
 \endfirsthead
-
-% \multicolumn{3}{c}{{\tablename\ \thetable{} -- tiếp theo}} \\
 \hline
-\textbf{Bảng tổng hợp} & \textbf{Grain} & \textbf{Nguồn và KPI phục vụ} \\
+\textbf{Bảng mart} & \textbf{Grain} & \textbf{Trường số đo} \\
 \hline
 \endhead
-
 \hline
-\multicolumn{3}{r}{{Còn tiếp}} \\
 \endfoot
-
 \hline
 \endlastfoot
 
 \texttt{fct\_daily\_ecommerce}
-& Ngày $\times$ kênh phiên $\times$ loại thiết bị
-& Từ \texttt{fct\_sessions}: số phiên, phiên có từng bước phễu, số đơn, doanh thu; suy ra tỷ lệ chuyển đổi, AOV, doanh thu/phiên \\
+& Ngày $\times$ nguồn phiên $\times$ thiết bị
+& \texttt{sessions}, \texttt{engaged\_sessions}, \texttt{page\_views}, \texttt{view\_item\_events}, \texttt{engagement\_time\_msec}, số phiên theo sáu bước phễu, số phiên vừa có từng mốc cart/checkout/payment vừa có mua hàng, \texttt{orders} và \texttt{revenue\_usd}. \\
 
 \texttt{fct\_event\_counts}
-& Ngày $\times$ loại sự kiện $\times$ loại thiết bị
-& Từ \texttt{fct\_events}: số sự kiện, lượt xem trang \\
+& Ngày $\times$ loại sự kiện $\times$ thiết bị
+& \texttt{event\_count} và \texttt{total\_engagement\_time\_msec}, đều từ \texttt{fct\_events}. \\
 
 \texttt{fct\_product\_performance}
 & Ngày $\times$ sản phẩm
-& Từ \texttt{fct\_item\_events} và \texttt{fct\_purchase\_items}: lượt xem, thêm giỏ, số lượng bán, doanh thu mặt hàng \\
+& \texttt{item\_view\_events}, \texttt{item\_select\_events}, \texttt{item\_add\_to\_cart\_events}, \texttt{item\_checkout\_events}, \texttt{units\_added\_to\_cart}, \texttt{units\_sold}, \texttt{item\_revenue\_usd}. Phần phễu được lấy từ \texttt{fct\_item\_events}; phần bán được lấy từ \texttt{fct\_purchase\_items}. \\
 
+\texttt{fct\_product\_channel\_daily}
+& Ngày $\times$ sản phẩm $\times$ nguồn phiên $\times$ thiết bị
+& Cùng nhóm số đo của \texttt{fct\_product\_performance}, thêm \texttt{session\_source\_key} và \texttt{device\_key} ở grain để lọc theo kênh/thiết bị mà không chia nhỏ sai tổng số. \\
 \end{xltabular}
 
-Doanh thu cấp phiên (\texttt{fct\_sessions}) và tổng \texttt{item\_revenue\_usd} (\texttt{fct\_purchase\_}\text{ }\texttt{ items}) được đối chiếu bằng kiểm thử dbt; chênh lệch được ghi vào nhật ký chất lượng dữ liệu.
+Hai bảng sản phẩm dùng phép nối ngoài đầy đủ giữa phễu sản phẩm và bán hàng. Một mặt hàng có thể có lượt xem nhưng không được mua, hoặc được mua mà không xuất hiện trong phễu xem. Doanh thu của phần bán vì vậy không bị đánh rơi khi thiếu hoạt động xem. Các bảng sự kiện cấp phiên đi xuống phiên/đơn hàng để tránh nhân doanh thu theo số dòng mặt hàng hay theo số chiều lọc. Tổng theo kênh/thiết bị của \texttt{fct\_product\_channel\_daily} phải khớp \texttt{fct\_product\_performance}; quan hệ này được kiểm tra bằng dbt test. \medskip
+
+Người dùng và người dùng mới được đếm phân biệt từ \texttt{fct\_sessions} nối với \texttt{dim\_user}, không lấy tổng vượt qua các grain khác nhau. Ngoài ra, \texttt{is\_new\_user BOOL} của \texttt{dim\_user} và \texttt{is\_new\_user\_session INT64} của \texttt{fct\_sessions} là hai thuộc tính khác nhau: thuộc tính đầu nói người dùng có \texttt{first\_visit}, thuộc tính sau nói phiên nào chứa \texttt{first\_visit}.

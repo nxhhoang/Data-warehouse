@@ -4,7 +4,7 @@
 
 \begin{itemize}
   \item \textbf{Tích hợp dữ liệu:} trích xuất dữ liệu sự kiện từ nguồn và đưa về một cấu trúc thống nhất.
-  \item \textbf{Kho dữ liệu:} lưu dữ liệu đã chuẩn hóa theo mô hình chiều (dimensional model) phục vụ phân tích theo thời gian, kênh truy cập, chiến dịch, thiết bị, khu vực địa lý và sản phẩm.
+  \item \textbf{Kho dữ liệu:} lưu dữ liệu đã chuẩn hóa theo mô hình chiều phục vụ phân tích theo thời gian, kênh truy cập, chiến dịch, thiết bị, khu vực địa lý và sản phẩm.
   \item \textbf{Hệ thống chỉ số (KPI):} tính toán các chỉ số theo một bộ định nghĩa duy nhất, dùng chung cho mọi báo cáo.
   \item \textbf{Ứng dụng hỗ trợ quyết định:} dashboard có bộ lọc, phân tích chi tiết, so sánh hiệu suất, cảnh báo theo ngưỡng và mô phỏng kịch bản.
 \end{itemize}
@@ -16,7 +16,7 @@ Do dữ liệu sử dụng không chứa chi phí quảng cáo, giải pháp đ�
 \subsection{Tập dữ liệu sử dụng}
 \subsubsection{Nguồn dữ liệu}
 
-Dự án sử dụng bộ dữ liệu công khai \texttt{ga4\_obfuscated\_sample\_ecommerce} thuộc chương trình BigQuery Public Datasets của Google. Bộ dữ liệu chứa mẫu dữ liệu sự kiện (event export) đã được làm mờ của Google Merchandise Store, một cửa hàng trực tuyến bán sản phẩm mang thương hiệu Google. Dữ liệu trải dài ba tháng, từ 01/11/2020 đến 31/01/2021. Website triển khai Google Analytics 4 theo chuẩn thương mại điện tử cùng cơ chế đo lường nâng cao (enhanced measurement). Dữ liệu được lưu trong các bảng sự kiện theo ngày.
+Dự án sử dụng bộ dữ liệu công khai \texttt{ga4\_obfuscated\_sample\_ecommerce} thuộc chương trình BigQuery Public Datasets của Google. Bộ dữ liệu chứa mẫu dữ liệu sự kiện (event export) đã được làm mờ của Google Merchandise Store, một cửa hàng trực tuyến bán sản phẩm mang thương hiệu Google. Dữ liệu trải dài ba tháng, từ 01/11/2020 đến 31/01/2021. Website triển khai Google Analytics 4 theo chuẩn thương mại điện tử cùng cơ chế đo lường nâng cao (enhanced measurement). Dữ liệu được lưu trong các bảng sự kiện theo ngày \parencite{ga4-export-schema}.
 
 \subsubsection{Cấu trúc và nội dung}
 
@@ -65,14 +65,14 @@ Mỗi dòng là một sự kiện của người dùng. Các nhóm thông tin ch
 \begin{itemize}
     \item \textbf{Dữ liệu đã bị làm mờ.} Một số trường chứa giá trị giữ chỗ như \texttt{<Other>}, \texttt{NULL} hoặc chuỗi rỗng, và tính nhất quán nội bộ có thể bị hạn chế. Đây là lý do quy trình ETL cần có bước kiểm tra, xử lý và ghi nhận chất lượng dữ liệu.
 
-    \item \textbf{Kết quả khảo sát chất lượng dữ liệu.} Khảo sát trên toàn bộ 92 ngày (22/10/2026, bộ truy vấn \texttt{survey/01}--\texttt{09}) ghi nhận: 100\% sự kiện có tham số \texttt{ga\_session\_id}; 845 phiên (0,23\%) phát sinh sự kiện trên hai ngày lịch, nên phiên được gán theo ngày sự kiện đầu tiên; 84,36\% người dùng có đúng một cặp source/medium trong toàn kỳ và 15,64\% đổi nguồn từ hai đến tám lần, nên nguồn cấp người dùng được khóa theo sự kiện đầu tiên; khoảng 41\% người dùng có nguồn ẩn danh do làm mờ dữ liệu. Trong 5.692 sự kiện \texttt{purchase}, 23 sự kiện thiếu \texttt{transaction\_id}, chỉ có 4.452 mã giao dịch phân biệt do trùng lặp, và \texttt{add\_to\_cart} vắng mặt trong 18/92 ngày. Các con số này là cơ sở cho quy tắc giao dịch hợp lệ ở mục 3.4 và cho nhật ký chất lượng dữ liệu.
+    \item \textbf{Kết quả khảo sát chất lượng dữ liệu.} Khảo sát toàn bộ 92 ngày (22/10/2026, bộ truy vấn \texttt{survey/01}--\texttt{09}) ghi nhận: 100\% sự kiện có tham số \texttt{ga\_session\_id}; 845 phiên (0,23\%) phát sinh sự kiện trên hai ngày lịch, nên phiên được gán theo ngày sự kiện đầu tiên; 84,36\% người dùng có đúng một cặp source/medium trong toàn kỳ và 15,64\% đổi nguồn từ hai đến tám lần, nên nguồn cấp người dùng được khóa theo sự kiện đầu tiên; khoảng 41\% người dùng có nguồn ẩn danh do làm mờ dữ liệu. Trong 5.692 sự kiện \texttt{purchase}, 23 sự kiện thiếu \texttt{transaction\_id}, chỉ có 4.452 mã giao dịch phân biệt do trùng lặp, và \texttt{add\_to\_cart} vắng mặt trong 18/92 ngày. Các con số này là cơ sở cho quy tắc giao dịch hợp lệ ở mục 3.4 và cho nhật ký chất lượng dữ liệu.
 
     \item \textbf{Không có chi phí quảng cáo.} Bộ dữ liệu không chứa chi phí, lượt hiển thị hay lượt nhấp từ nền tảng quảng cáo, nên các chỉ số như CPA, ROAS, CPC không nằm trong phạm vi đồ án. Nhóm không tự tạo dữ liệu chi phí giả định, mà đánh giá hiệu quả kênh và chiến dịch bằng các chỉ số \textbf{không phụ thuộc chi phí}: lưu lượng, hành vi, tỷ lệ chuyển đổi, doanh thu và giá trị đơn hàng. Khi doanh nghiệp có dữ liệu chi phí thực, bảng chi phí có thể được bổ sung vào kho theo cùng chiều thời gian và chiều kênh/chiến dịch để mở rộng sang CPA, ROAS mà không phải thay đổi kiến trúc.
 
     \item \textbf{Phạm vi thời gian ngắn.} Dữ liệu chỉ trải dài ba tháng, bao gồm mùa mua sắm cuối năm, nên các kết luận về xu hướng và tính mùa vụ cần được diễn giải thận trọng.
 \end{itemize}
 
-Tập dữ liệu được lựa chọn vì mô phỏng sát một doanh nghiệp thương mại điện tử có website, nhiều nguồn truy cập và luồng mua hàng đầy đủ, phù hợp với bối cảnh và đáp ứng yêu cầu dùng bộ dữ liệu công khai. Hệ thống được thiết kế để có thể mở rộng cho các nguồn khác như Google Ads, Meta Ads, TikTok Ads hoặc email marketing.
+Tập dữ liệu được lựa chọn vì mô phỏng sát một doanh nghiệp thương mại điện tử có website, nhiều nguồn truy cập và luồng mua hàng đầy đủ, phù hợp với bối cảnh và đáp ứng yêu cầu dùng bộ dữ liệu công khai. Phạm vi dữ liệu đầu vào này không giả định thêm chi phí quảng cáo. Các hướng mở rộng dữ liệu và hạ tầng được trình bày riêng ở phần kết luận.
 
 \subsection{Kiến trúc hệ thống}
 
@@ -81,19 +81,19 @@ Kiến trúc gồm năm tầng chính được tổ chức theo từng chức n�
 \begin{enumerate}
     \item \textbf{Tầng nguồn dữ liệu:} Các bảng sự kiện theo ngày có tên dạng \texttt{events\_YYYYMMDD}. Mỗi bản ghi đại diện cho một sự kiện trên website như xem trang, xem sản phẩm, thêm sản phẩm vào giỏ hàng hoặc mua hàng. Hệ thống sử dụng cơ chế phát lại từng sự kiện để mô phỏng quá trình tiếp nhận dữ liệu trực tuyến.
 
-    \item \textbf{Tầng thu thập (Extract):} Python Publisher truy vấn dữ liệu từ BigQuery theo khoảng thời gian cấu hình, chuyển từng bản ghi thành thông điệp JSON và gửi đến Google Cloud Pub/Sub. Pub/Sub đóng vai trò trung gian giữa thành phần phát dữ liệu và thành phần xử lý, giúp tách biệt quá trình thu thập với xử lý dữ liệu. Các thông tin định danh và thời gian được duy trì để hỗ trợ truy vết, kiểm tra dữ liệu trùng lặp. Những thông điệp không thể xử lý được chuyển đến dead-letter topic để phục vụ kiểm tra và khắc phục lỗi.
+    \item \textbf{Tầng thu thập (Extract):} Python Publisher truy vấn dữ liệu từ BigQuery theo khoảng thời gian cấu hình, chuyển từng bản ghi thành thông điệp JSON và gửi đến Pub/Sub Emulator trên máy phát triển \parencite{pubsub-emulator}. Hàng đợi này tách quá trình phát lại khỏi quá trình làm sạch dữ liệu, nhưng chỉ được dùng cho thử nghiệm trong phiên emulator, không phải kho lưu trữ dài hạn. Các thông tin khóa và dấu thời gian được giữ để truy vết và kiểm tra trùng lặp. Thông điệp không xử lý được được gửi tới dead-letter topic kèm lý do.
 
-    \item \textbf{Tầng xử lý (Transform):} Tiếp nhận và xử lý các thông điệp từ Pub/Sub. Dataflow thực thi pipeline theo mô hình đọc, biến đổi và ghi dữ liệu, qua đó đưa các sự kiện từ định dạng thông điệp sang cấu trúc dữ liệu phù hợp để lưu trữ và phân tích.
+    \item \textbf{Tầng xử lý (Transform):} Apache Beam chạy pipeline bằng DirectRunner trên máy phát triển \parencite{apache-direct-runner}. Pipeline đọc subscription của emulator, biến đổi dữ liệu JSON thành sự kiện hợp lệ rồi ghi các nhánh kết quả ra file JSONL cục bộ. DirectRunner được dùng để kiểm chứng tính đúng đắn của pipeline, không phải để thay thế một hệ thống xử lý phân tán quy mô lớn.
     \begin{itemize}
         \item Giải mã thông điệp JSON và kiểm tra các trường bắt buộc (ngày, tên, thời điểm sự kiện); thông điệp không giải mã được hoặc sai cấu trúc được ghi vào bảng dead-letter kèm lý do, để tránh làm gián đoạn toàn bộ pipeline.
         \item Ép kiểu chuẩn cho dấu thời gian và các trường số, thay giá trị giữ chỗ (\texttt{<Other>}, \texttt{(data deleted)}, \texttt{(not set)}, chuỗi rỗng) bằng giá trị thiếu, và điền cấu trúc rỗng cho \texttt{event\_params}, \texttt{items}, \texttt{ecommerce} để mọi bản ghi có cùng hình dạng. Bản ghi được giữ nguyên cấu trúc lồng nhau của dữ liệu gốc.
         \item Hỗ trợ phát hiện các sự kiện trùng lặp dựa theo bộ trường định danh trong tệp cấu hình chất lượng (\texttt{user\_pseudo\_id}, \texttt{event\_timestamp}, \texttt{event\_name}, \texttt{event\_bundle\_sequence\_id}) trong từng cửa sổ thời gian; bản trùng bị loại và số dòng bị loại được ghi vào nhật ký chất lượng dữ liệu. Việc khử trùng toàn cục tiếp tục được bảo đảm ở tầng staging.
-        \item Áp dụng bộ quy tắc chất lượng dùng chung với tầng kho: sự kiện \texttt{purchase} thiếu \texttt{transaction\_id} hoặc có doanh thu bằng không hoặc âm bị loại và ghi nhật ký; sự kiện thiếu định danh phiên được giữ lại và xử lý bằng dòng ``Unknown'' của dimension ở tầng sau.
-        \item Ghi các bản ghi hợp lệ vào bảng thô \texttt{events\_YYYYMMDD}, phân mảnh theo ngày sự kiện, trong dataset thô của BigQuery.
+        \item Áp dụng bộ quy tắc chất lượng đồng nhất với tầng kho dữ liệu: loại bỏ và ghi nhật ký đối với các sự kiện \texttt{purchase} thiếu \texttt{transaction\_id} hoặc có doanh thu không hợp lệ ($\le 0$); riêng các sự kiện thiếu định danh phiên vẫn được giữ lại để ánh xạ về bản ghi mặc định ``\texttt{Unknown}'' ở các bảng dimension tầng sau.
+        \item Xuất các bản ghi hợp lệ, dead-letter và nhật ký chất lượng ra các tệp JSONL. Sau đó, script \texttt{load\_raw\_to\_bigquery.py} gom nhóm sự kiện theo ngày và nạp vào bảng \texttt{events\_YYYYMMDD} trên BigQuery Sandbox thông qua client-side load job, giúp bảo toàn cấu trúc dữ liệu lồng nhau phục vụ cho tầng staging.
         \item Việc làm phẳng \texttt{event\_params}, tách \texttt{items} thành từng dòng mặt hàng và ghép \texttt{user\_pseudo\_id} với \texttt{ga\_session\_id} thành định danh phiên được thực hiện ở tầng staging của dbt (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}). Nhờ tầng xử lý giữ nguyên cấu trúc gốc, kho dữ liệu chạy được trên cả dữ liệu công khai lẫn dữ liệu đã qua pipeline mà không phải sửa mô hình.
     \end{itemize}
 
-    \item \textbf{Tầng kho dữ liệu (Load):} Google BigQuery được sử dụng làm nền tảng lưu trữ kho dữ liệu. dbt đọc bảng thô \texttt{events\_*} do Dataflow ghi (hoặc trỏ thẳng sang dataset công khai qua biến cấu hình), thực hiện biến đổi dữ liệu và xây dựng mô hình sao (Star Schema), trong đó các bảng dimension như thời gian, sự kiện, người dùng, thiết bị, địa lý, trang web, sản phẩm và nguồn truy cập liên kết với bốn bảng fact \texttt{fct\_events}, \texttt{fct\_sessions}, \texttt{fct\_purchase\_items} và \texttt{fct\_item\_events}. Từ đó, hệ thống tạo các bảng tổng hợp như \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts} và \texttt{fct\_product\_performance} để phục vụ phân tích KPI và dashboard.
+    \item \textbf{Tầng kho dữ liệu (Load):} Dữ liệu JSONL được nạp vào BigQuery Sandbox, sau đó dbt dựng staging và mô hình sao gồm 4 bảng fact dùng chung 8 bảng dimension. Ba view staging làm phẳng tham số và mặt hàng, tách phiên và chọn giao dịch hợp lệ. Bốn bảng marts là \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts}, \texttt{fct\_product\_performance} và \texttt{fct\_product\_channel\_daily}; chúng cung cấp các số đo phục vụ dashboard và ba KPI view. Sandbox được giữ trong giới hạn miễn phí và không yêu cầu bucket trung gian hoặc streaming inserts.
 
     \item \textbf{Tầng phân tích và ứng dụng:} Xây dựng dashboard trực quan, khai thác dữ liệu từ các bảng tổng hợp trong BigQuery. Dashboard cung cấp các chỉ số như số lượng sự kiện, số người dùng, số phiên, giao dịch, doanh thu và hiệu suất sản phẩm. Người dùng có thể theo dõi xu hướng theo thời gian và so sánh kết quả giữa các nhóm thiết bị, khu vực địa lý hoặc nguồn truy cập. Những thông tin này tạo cơ sở cho việc đánh giá hoạt động và hỗ trợ ra quyết định dựa trên dữ liệu.
 \end{enumerate}
@@ -325,27 +325,22 @@ Chuyển đổi là sự kiện \texttt{purchase} được ghi nhận theo ngu�
 \end{table}
 
 
-Vấn đề 1, 2, 3, 5 được giải quyết đầy đủ trên dữ liệu thật. Vấn đề 4 ở mức phân tích mô tả. Vấn đề 6 ở mức một phần: hệ thống cung cấp cơ sở về hiệu quả kênh và mô phỏng theo lưu lượng, chuyển đổi nhưng chưa đánh giá được hiệu quả theo chi phí do bộ dữ liệu không chứa chi phí quảng cáo. Điều này phù hợp với mục 2.2 rằng các chỉ số CPA, ROAS cần được xem cùng dữ liệu chi phí và biên lợi nhuận.
+Ánh xạ này cho thấy loại hỗ trợ mà mỗi tầng cung cấp cho người ra quyết định. Các chỉ số được tính từ cùng một định nghĩa giao dịch và cùng các dimension dùng chung, thay vì từ các bảng tùy ý không đồng bộ. Mức độ tin cậy của kết quả lượng hóa được trình bày trong phần Evaluation: quá trình thử hiện tại sử dụng một mini-batch Sandbox, không phải đánh giá hiệu năng đã hoàn tất trên cả ba tháng dữ liệu.
 
 \newpage
 \subsection{Phạm vi, giả định và giới hạn}
 
 \subsection*{Phạm vi.}
-
-Hệ thống xử lý bộ dữ liệu mẫu ba tháng theo cơ chế phát lại: Python Publisher truy vấn dữ liệu lịch sử và phát từng sự kiện qua Pub/Sub theo thứ tự thời gian, Dataflow xử lý luồng và ghi vào bảng thô, mô phỏng quá trình tiếp nhận dữ liệu trực tuyến. Hệ thống chưa kết nối với nguồn dữ liệu thật phát sinh thời gian thực và chưa kết nối trực tiếp với API của các nền tảng quảng cáo. Kiến trúc được thiết kế để có thể bổ sung nguồn mới (Google Ads, Meta Ads, TikTok Ads, email) và bảng chi phí thực bằng cách thêm bộ trích xuất và ánh xạ về cùng mô hình chiều.\\
-
+Hệ thống phát lại một khoảng dữ liệu lịch sử có kiểm soát để thử nghiệm luồng tương tự tiếp nhận trực tuyến. Publisher sắp xếp các sự kiện theo thời gian trước khi đưa qua emulator, DirectRunner làm sạch và ghi JSONL, rồi Sandbox lưu raw và dbt tổng hợp. Khối lượng đánh giá mô phỏng được giới hạn để không vượt quota. Các hướng mở rộng lên hạ tầng quản lý hoặc nguồn dữ liệu trả phí được tách riêng trong phần kết luận, không nằm trong luồng mặc định không bật billing.\\
 
 \subsection*{Giả định.}
-
 \begin{itemize}
     \item Một phiên được xác định bởi cặp \texttt{user\_pseudo\_id} và \texttt{ga\_session\_id}; kênh của phiên được suy ra từ source/medium theo bộ quy tắc gom nhóm do nhóm định nghĩa và công bố.
 
     \item Doanh thu lấy từ giá trị giao dịch trong dữ liệu; chưa có dữ liệu giá vốn nên chưa tính được lợi nhuận. Vì vậy, doanh thu cao chưa có nghĩa là lợi nhuận cao, đúng như lưu ý ở mục 1.1.
 \end{itemize}
 
-
 \subsection*{Giới hạn.}
-
 \begin{itemize}
     \item Không có dữ liệu chi phí, hiển thị và lượt nhấp từ nền tảng quảng cáo nên không đánh giá được CPA, ROAS, CPC và hiệu quả đầu tư theo chi phí.
 

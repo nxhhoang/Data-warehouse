@@ -15,10 +15,13 @@ from src.extract.publisher import load_env_file, publish_all, to_yyyymmdd
 class FakeFuture:
     """Mimics google.cloud.pubsub_v1 futures."""
 
-    def __init__(self, should_fail=False):
+    def __init__(self, should_fail=False, timeout=False):
         self.should_fail = should_fail
+        self.timeout = timeout
 
     def result(self, timeout=None):
+        if self.timeout:
+            raise TimeoutError("fake timeout")
         if self.should_fail:
             raise publisher.GoogleAPIError("fake failure")
         return "msg-id"
@@ -27,17 +30,29 @@ class FakeFuture:
 class FakePublisher:
     """Mimics PublisherClient.publish for the main topic and the DLQ."""
 
-    def __init__(self, fail_topic=False):
+    def __init__(self, fail_topic=False, timeout=False):
         self.fail_topic = fail_topic
+        self.timeout = timeout
         self.topic_calls = []
         self.dlq_calls = []
 
     def publish(self, topic_path, data):
         if topic_path.endswith("ga4-events"):
             self.topic_calls.append(data)
-            return FakeFuture(should_fail=self.fail_topic)
+            return FakeFuture(should_fail=self.fail_topic, timeout=self.timeout)
         self.dlq_calls.append(data)
         return FakeFuture()
+
+
+class TestFilePayloads:
+    def test_yields_non_empty_lines(self, tmp_path):
+        env_file = tmp_path / "fixture.jsonl"
+        env_file.write_text('{"a": 1}\n\n   \n{"b": 2}\n', encoding="utf-8")
+        assert list(publisher.file_payloads(str(env_file))) == ['{"a": 1}', '{"b": 2}']
+
+    def test_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            list(publisher.file_payloads(str(tmp_path / "nope.jsonl")))
 
 
 class TestToYyyymmdd:
@@ -91,6 +106,15 @@ class TestPublishAll:
                              "projects/p/topics/ga4-events-dlq", iter(payloads))
         assert stats == {"published": 0, "failed_to_dlq": 1, "total": 1}
         # MAX_PUBLISH_RETRIES attempts against the main topic, then one DLQ publish
+        assert len(fake.topic_calls) == publisher.MAX_PUBLISH_RETRIES
+        assert len(fake.dlq_calls) == 1
+
+    def test_timeout_retries_and_routes_to_dlq(self, monkeypatch):
+        monkeypatch.setattr(publisher.time, "sleep", lambda _: None)
+        fake = FakePublisher(fail_topic=True, timeout=True)
+        stats = publish_all(fake, "projects/p/topics/ga4-events",
+                            "projects/p/topics/ga4-events-dlq", iter(['{"n": 1}']))
+        assert stats == {"published": 0, "failed_to_dlq": 1, "total": 1}
         assert len(fake.topic_calls) == publisher.MAX_PUBLISH_RETRIES
         assert len(fake.dlq_calls) == 1
 
