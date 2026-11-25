@@ -1,6 +1,6 @@
 {# Partitioning is off by default: BigQuery Sandbox expires partitions older than
    60 days, so 2020 partitions would be deleted as soon as they are written.
-   Enable with --vars '{partition_tables: true}' on a billing-enabled project. #}
+   Only enable when the destination retention policy fits historical 2020 data. #}
 {{
     config(
         partition_by=({"field": "event_date", "data_type": "date"}
@@ -10,19 +10,19 @@
 }}
 
 SELECT
-    e.event_id,
-    COALESCE(d.date_key, -1) AS date_key,
-    COALESCE(ev.event_key, -1) AS event_key,
-    COALESCE(u.user_key, -1) AS user_key,
-    COALESCE(dev.device_key, -1) AS device_key,
-    COALESCE(geo.geo_key, -1) AS geo_key,
-    COALESCE(pg.page_key, -1) AS page_key,
-    COALESCE(s.session_source_key, u.user_traffic_source_key, -1) AS traffic_source_key,
-    COALESCE(e.session_id, 'Unknown') AS session_id,
-    e.event_date,
-    e.event_timestamp,
-    e.event_ts_utc,
-    e.engagement_time_msec
+    e.event_id, -- INT64
+    COALESCE(d.date_key, -1) AS date_key, -- INT64
+    COALESCE(ev.event_key, -1) AS event_key, -- INT64
+    COALESCE(u.user_key, -1) AS user_key, -- INT64
+    COALESCE(dev.device_key, -1) AS device_key, -- INT64
+    COALESCE(geo.geo_key, -1) AS geo_key, -- INT64
+    COALESCE(pg.page_key, -1) AS page_key, -- INT64
+    COALESCE(s.session_source_key, u.user_traffic_source_key, -1) AS traffic_source_key, -- INT64
+    COALESCE(e.session_id, 'Unknown') AS session_id, -- STRING
+    e.event_date, -- DATE
+    e.event_timestamp, -- INT64: microseconds since epoch (UTC)
+    e.event_ts_utc, -- TIMESTAMP
+    e.engagement_time_msec -- INT64: milliseconds
 FROM {{ ref('stg_ga4_events') }} e
 LEFT JOIN {{ ref('dim_date') }} d ON e.date_key = d.date_key
 LEFT JOIN {{ ref('dim_event') }} ev ON TRIM(e.event_name) = ev.event_name

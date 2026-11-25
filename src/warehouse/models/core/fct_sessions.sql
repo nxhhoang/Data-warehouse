@@ -104,35 +104,35 @@ session_orders AS (
     GROUP BY session_id
 )
 SELECT
-    fa.session_id,
-    COALESCE(fa.date_key, -1) AS date_key,
-    COALESCE(fa.user_key, -1) AS user_key,
-    COALESCE(fa.device_key, -1) AS device_key,
-    COALESCE(fa.geo_key, -1) AS geo_key,
-    COALESCE(fa.landing_page_key, -1) AS landing_page_key,
+    fa.session_id, -- STRING
+    COALESCE(fa.date_key, -1) AS date_key, -- INT64
+    COALESCE(fa.user_key, -1) AS user_key, -- INT64
+    COALESCE(fa.device_key, -1) AS device_key, -- INT64
+    COALESCE(fa.geo_key, -1) AS geo_key, -- INT64
+    COALESCE(fa.landing_page_key, -1) AS landing_page_key, -- INT64
     -- 2-tier source attribution: prioritize session-level source, otherwise fallback to user-level source
-    COALESCE(fa.first_session_source_key, fa.user_source_key, -1) AS session_source_key,
-    COALESCE(fa.user_source_key, -1) AS user_source_key,
+    COALESCE(fa.first_session_source_key, fa.user_source_key, -1) AS session_source_key, -- INT64
+    COALESCE(fa.user_source_key, -1) AS user_source_key, -- INT64
     CASE
         WHEN fa.first_session_source_key IS NOT NULL THEN 'session'
         ELSE 'user_fallback'
-    END AS attribution_basis,
-    fa.session_start_ts,
-    sm.is_new_user_session,
-    COALESCE(sm.user_session_number, -1) AS user_session_number,
-    sm.event_count,
-    sm.page_view_count,
-    sm.view_item_count,
-    sm.engagement_time_msec,
-    sm.is_engaged,
-    sm.has_view_item,
-    sm.has_add_to_cart,
-    sm.has_begin_checkout,
-    sm.has_add_shipping_info,
-    sm.has_add_payment_info,
-    CASE WHEN COALESCE(so.order_count, 0) > 0 THEN 1 ELSE 0 END AS has_purchase,
-    COALESCE(so.order_count, 0) AS order_count,
-    COALESCE(so.revenue_usd, 0.0) AS revenue_usd
+    END AS attribution_basis, -- STRING: session or user_fallback
+    fa.session_start_ts, -- TIMESTAMP
+    sm.is_new_user_session, -- INT64: 0 or 1
+    COALESCE(sm.user_session_number, -1) AS user_session_number, -- INT64
+    sm.event_count, -- INT64
+    sm.page_view_count, -- INT64
+    sm.view_item_count, -- INT64
+    sm.engagement_time_msec, -- INT64: milliseconds
+    sm.is_engaged, -- INT64: 0 or 1
+    sm.has_view_item, -- INT64: 0 or 1
+    sm.has_add_to_cart, -- INT64: 0 or 1
+    sm.has_begin_checkout, -- INT64: 0 or 1
+    sm.has_add_shipping_info, -- INT64: 0 or 1
+    sm.has_add_payment_info, -- INT64: 0 or 1
+    CASE WHEN COALESCE(so.order_count, 0) > 0 THEN 1 ELSE 0 END AS has_purchase, -- INT64: 0 or 1
+    COALESCE(so.order_count, 0) AS order_count, -- INT64
+    COALESCE(so.revenue_usd, 0.0) AS revenue_usd -- FLOAT64: US dollars
 FROM session_first_attrs fa
 JOIN session_metrics sm ON fa.session_id = sm.session_id
 LEFT JOIN session_orders so ON fa.session_id = so.session_id

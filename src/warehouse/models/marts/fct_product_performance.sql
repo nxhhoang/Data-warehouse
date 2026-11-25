@@ -22,15 +22,15 @@ item_sales AS (
     GROUP BY date_key, product_key
 )
 SELECT
-    COALESCE(f.date_key, s.date_key) AS date_key,
-    COALESCE(f.product_key, s.product_key) AS product_key,
-    COALESCE(f.item_view_events, 0) AS item_view_events,
-    COALESCE(f.item_select_events, 0) AS item_select_events,
-    COALESCE(f.item_add_to_cart_events, 0) AS item_add_to_cart_events,
-    COALESCE(f.item_checkout_events, 0) AS item_checkout_events,
-    COALESCE(f.units_added_to_cart, 0) AS units_added_to_cart,
-    COALESCE(s.units_sold, 0) AS units_sold,
-    COALESCE(s.item_revenue_usd, 0.0) AS item_revenue_usd
+    COALESCE(f.date_key, s.date_key) AS date_key, -- INT64
+    COALESCE(f.product_key, s.product_key) AS product_key, -- INT64
+    COALESCE(f.item_view_events, 0) AS item_view_events, -- INT64
+    COALESCE(f.item_select_events, 0) AS item_select_events, -- INT64
+    COALESCE(f.item_add_to_cart_events, 0) AS item_add_to_cart_events, -- INT64
+    COALESCE(f.item_checkout_events, 0) AS item_checkout_events, -- INT64
+    COALESCE(f.units_added_to_cart, 0) AS units_added_to_cart, -- INT64
+    COALESCE(s.units_sold, 0) AS units_sold, -- INT64
+    COALESCE(s.item_revenue_usd, 0.0) AS item_revenue_usd -- FLOAT64: US dollars
 FROM item_funnel f
 FULL OUTER JOIN item_sales s
     ON f.date_key = s.date_key AND f.product_key = s.product_key
