@@ -11,6 +11,10 @@ from the repository root.
 | `setup_venv.sh` | setup | Create and populate the `.venv` virtual environment |
 | `run_simulation.sh` | all (local) | Full simulation chain: fixture → dry-run → verify → quality-log export |
 | `run_emulator_chain.sh` | all (local) | Same chain but through the local Pub/Sub emulator (no billing) |
+| `run_emulator_replay.sh` | all (local) | Variant B: real BigQuery events through the emulator, with resource watchdog |
+| `stop_emulator_replay.sh` | cleanup | Stop every process registered by the replay orchestrator |
+| `watch_resources.py` | monitoring | Track RAM/disk and clean up replay processes |
+| `pubsub_status.py` | monitoring | List Pub/Sub resources and safely inspect messages |
 | `make_test_fixture.py` | 3 — Transform | Generate the GA4-like JSONL fixture used by the dry-run |
 | `rebuild_warehouse.sh` | 3–4 — Transform + Warehouse | Recompile channels, rebuild all dbt models, run tests, deploy KPI views |
 | `compile_channel_macro.py` | 4 — Warehouse | Compile `config/channels.yaml` into the `map_channel` dbt macro |
@@ -42,7 +46,9 @@ no GCP account, no billing, no secrets. Chain:
 4. `export_quality_log.py --from-jsonl` — write `data/quality_log/*.csv`
 
 ```bash
-bash scripts/run_simulation.sh
+bash scripts/run_emulator_chain.sh
+# or reuse an emulator already listening on localhost:8085:
+EMULATOR_PRESTARTED=1 bash scripts/run_emulator_chain.sh
 ```
 
 This is the exact chain the GitHub Actions workflow
@@ -59,6 +65,42 @@ No billing, no GCP account (the publisher runs in `--from-file` mode).
 ```bash
 gcloud components install pubsub-emulator   # one-time
 bash scripts/run_emulator_chain.sh
+```
+
+## run_emulator_replay.sh
+
+Variant B (runbook section 4d): replay **real BigQuery data** through the local
+Pub/Sub emulator. Manages the emulator, publisher, streaming pipeline and a
+RAM/disk watchdog; every PID is registered under `build/emulator_replay/pids`
+and stopped on all exit paths. Publishing speed is intentionally unchanged —
+this run validates correctness, not throughput.
+
+```bash
+bash scripts/run_emulator_replay.sh [--load] [--timeout 1800] [--window 600]
+# --load: upload output to the real raw dataset with load_raw_to_bigquery.py
+# PIPELINE_EXTRA_ARGS="--direct_running_mode=in_memory" for runner compatibility
+```
+
+## stop_emulator_replay.sh / watch_resources.py
+
+Stops the processes registered by a previous replay, including descendant
+Beam workers on Windows (`taskkill /T`). The watchdog reports each process's
+RSS and free disk every 15 seconds and can also be invoked once for a manual
+status check:
+
+```bash
+bash scripts/stop_emulator_replay.sh
+python scripts/watch_resources.py --once
+```
+
+## pubsub_status.py
+
+Lists the topics and subscriptions in a project; works with the emulator and
+with real Pub/Sub. `--peek N --subscription S` inspects messages without ack,
+but only use it after stopping the pipeline (peek competes for messages).
+
+```bash
+python scripts/pubsub_status.py --project local-project
 ```
 
 ## make_test_fixture.py

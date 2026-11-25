@@ -113,6 +113,20 @@ bash scripts/run_emulator_chain.sh
 
 Script tự làm trọn chuỗi: khởi động emulator → publish fixture 9 sự kiện (publisher chế độ `--from-file`, không cần tài khoản GCP) → chạy pipeline đọc subscription thật của emulator (DirectRunner, cửa sổ khử trùng 5 giây cho test nhanh) → đợi output hội tụ đúng định tuyến kỳ vọng (4/2/4) → verify và xuất quality log CSV.
 
+Đã kiểm chứng chuỗi này thực tế trên Windows: `DirectRunner` đọc được emulator, `verify_dry_run.py` PASS (4 sự kiện hợp lệ, 2 dead-letter, 4 quality-log row).
+
+Nếu gcloud trong bash báo thiếu Java dù `java -version` chạy được, hãy khởi động emulator từ PowerShell (giữ nguyên PATH của Windows), rồi chạy script ở chế độ dùng emulator có sẵn:
+
+```powershell
+gcloud beta emulators pubsub start --project=local-project --host-port=localhost:8085
+```
+
+```bash
+EMULATOR_PRESTARTED=1 bash scripts/run_emulator_chain.sh
+```
+
+Chế độ này không tạo/kill emulator của bạn; hãy tự tắt process emulator sau khi chuỗi kết thúc.
+
 Cần nạp kết quả vào kho thật: chạy thêm `scripts/load_raw_to_bigquery.py --from-jsonl build/emulator_run` — load job phía client (`load_table_from_file`) ghi vào `events_YYYYMMDD` của raw dataset mà **không cần bucket GCS**, nên chạy được trong Sandbox chưa bật billing. Sau đó trỏ `BQ_RAW_*` sang raw dataset và `rebuild_warehouse.sh` như 4b.
 
 Giới hạn cần nhớ của emulator (so với Pub/Sub thật):
@@ -121,6 +135,38 @@ Giới hạn cần nhớ của emulator (so với Pub/Sub thật):
 - Tin nhắn nằm trong RAM, tắt emulator là mất — chỉ dùng để phát lại được, không phải nơi lưu trữ.
 - Đừng benchmark độ trễ thật trên nó; và với replay toàn bộ 92 ngày, emulator chỉ ổn khi pipeline chạy cùng lúc (nó không đệm bền như hàng đợi thật).
 - Một ẩn số đã được đánh dấu trong script: khả năng tương thích giữa `ReadFromPubSub` của Beam và emulator. Nếu chuỗi FAIL sau 120 giây, thử thêm `--direct_running_mode=in_memory`; nếu vẫn không được, lùi về file mode (mức 0) — chuỗi transform vẫn được kiểm chứng đầy đủ, chỉ thiếu đúng tầng hàng đợi.
+
+### 4d. Biến thể B — replay dữ liệu thật qua emulator (không billing)
+
+Đây là chuỗi đầy đủ nhất có thể chạy không-billing: `publisher` query dữ liệu thật trên dataset public (free query) và publish vào emulator, pipeline DirectRunner tiêu thụ, cuối chuỗi có thể nạp JSONL vào raw dataset Sandbox. Khác 4c ở chỗ publisher dùng nguồn BigQuery thật, không dùng `--from-file`.
+
+Chuẩn bị: gcloud CLI + Java, `gcloud components install pubsub-emulator`, `.env` điền `GCP_PROJECT_ID` thật và `EXTRACT_LIMIT=1000`, và đăng nhập `gcloud auth application-default login` (chỉ cần cho query nguồn và bước nạp). Tiến hành:
+
+```bash
+# Replay, giữ nguyên tốc độ hiện có của publisher (không tăng tốc, không batch)
+bash scripts/run_emulator_replay.sh --timeout 1800
+
+# Sau khi replay ổn định: nạp output vào raw dataset thật (không qua GCS)
+# Nếu chưa có dataset thô: bq mk --dataset $GCP_PROJECT_ID:$RAW_DATASET
+bash scripts/run_emulator_replay.sh --load --timeout 1800
+
+# Stop dọn dẹp thủ công nếu đóng terminal giữa chừng
+bash scripts/stop_emulator_replay.sh
+```
+
+Script tự quản bốn process (emulator, publisher, pipeline, watchdog RAM). PID được ghi tại `build/emulator_replay/pids/`; trap EXIT dừng toàn bộ ở mọi đường thoát, `taskkill /T` trên Windows dừng cả cây process/worker. Nếu vượt ngưỡng RAM 4 GB cho một process hoặc đĩa trống dưới 2 GB, watchdog cảnh báo và script dừng chuỗi. `--window` chỉnh cửa sổ khử trùng; nếu DirectRunner không tương thích emulator, chạy `PIPELINE_EXTRA_ARGS="--direct_running_mode=in_memory" bash scripts/run_emulator_replay.sh`.
+
+**Cách nhận biết từng phần đang chạy:**
+
+| Phần | Dấu hiệu kiểm chứng |
+|---|---|
+| Query BigQuery | Publisher in `dry-run estimated scan` và `BigQuery job id`; job thật xuất hiện ở trang lịch sử query của project |
+| Publisher | `[publish] heartbeat` mỗi 10 giây, kèm ev/s; thống kê cuối có `published` bằng tổng đã phát |
+| Emulator/PubSub | `python scripts/pubsub_status.py --project local-project` thấy `ga4-events` và `ga4-events-sub`; chỉ `--peek` khi pipeline đã dừng |
+| Pipeline | File JSONL dưới `build/emulator_replay/output` xuất hiện/tăng dòng; script chỉ xong khi output ngừng tăng 30 giây |
+| Load Sandbox | `load_raw_to_bigquery.py` in số dòng đã load theo ngày; kiểm lại `SELECT COUNT(*) FROM <raw_dataset>.events_YYYYMMDD` |
+
+**Hạn mức query miễn phí là 1 TiB/tháng, không phải 10 TB.** Ước tính thực chi phí: replay nguồn ~4,5 GB; `dbt run --full-refresh` ~40–80 GB; parity test ~9–10 GB; benchmark ~9 GB. Một chu kỳ đầy đủ ~65–100 GB → khoảng 12–15 chu kỳ/tháng. Dùng `EXTRACT_LIMIT` nhỏ và khoảng ngày hẹp khi kiểm thử để giữ nguyên quota cho các lần sau.
 
 ## 5. Mức 2 — Dataflow production
 

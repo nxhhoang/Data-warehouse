@@ -27,15 +27,25 @@ else
   PY=python3
 fi
 
-command -v gcloud >/dev/null 2>&1 || {
-  echo "gcloud CLI not found — install it plus 'gcloud components install pubsub-emulator' (runbook section 4c)"
-  exit 1
-}
+if [ "${EMULATOR_PRESTARTED:-0}" != "1" ]; then
+  command -v gcloud >/dev/null 2>&1 || {
+    echo "gcloud CLI not found — install it plus 'gcloud components install pubsub-emulator' (runbook section 4c)"
+    exit 1
+  }
+fi
 
-echo "[emu 1/4] starting Pub/Sub emulator on localhost:$EMULATOR_PORT..."
-gcloud beta emulators pubsub start \
-    --project=$EMULATOR_PROJECT --host-port=localhost:$EMULATOR_PORT &
-EMULATOR_PID=$!
+# If an emulator is already listening on localhost:8085 (recommended on
+# Windows when gcloud/PowerShell handles the Java process), use it directly:
+#   EMULATOR_PRESTARTED=1 bash scripts/run_emulator_chain.sh
+EMULATOR_PID=""
+if [ "${EMULATOR_PRESTARTED:-0}" = "1" ]; then
+  echo "[emu 1/4] using the emulator already listening on localhost:$EMULATOR_PORT..."
+else
+  echo "[emu 1/4] starting Pub/Sub emulator on localhost:$EMULATOR_PORT..."
+  gcloud beta emulators pubsub start \
+      --project=$EMULATOR_PROJECT --host-port=localhost:$EMULATOR_PORT &
+  EMULATOR_PID=$!
+fi
 trap 'kill $EMULATOR_PID 2>/dev/null || true' EXIT
 
 # Wait until the emulator accepts TCP connections (up to 60s)

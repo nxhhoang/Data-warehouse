@@ -112,17 +112,19 @@ def setup_pubsub(publisher: pubsub_v1.PublisherClient, project_id: str,
 
     try:
         subscriber.create_subscription(
-            name=sub_path,
-            topic=topic_path,
-            dead_letter_policy={
-                "dead_letter_topic": dlq_path,
-                "max_delivery_attempts": 5,
+            request={
+                "name": sub_path,
+                "topic": topic_path,
+                "dead_letter_policy": {
+                    "dead_letter_topic": dlq_path,
+                    "max_delivery_attempts": 5,
+                },
             },
         )
         print(f"[pubsub] created subscription {subscription_id} (with dead-letter policy)")
     except GoogleAPIError as err:
         print(f"[pubsub] could not attach dead-letter policy ({err}); creating plain subscription")
-        subscriber.create_subscription(name=sub_path, topic=topic_path)
+        subscriber.create_subscription(request={"name": sub_path, "topic": topic_path})
         print(
             "Note: grant roles/pubsub.publisher to the Pub/Sub service account "
             f"on topic {dlq_topic_id} to enable dead-letter mode."
@@ -163,15 +165,28 @@ def fetch_event_payloads(bq_client: bigquery.Client, source_dataset: str,
     """
     if limit and limit > 0:
         query += f" LIMIT {int(limit)}"
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
-            bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
-        ]
-    )
+    params = [
+        bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
+        bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
+    ]
+    try:
+        dry_config = bigquery.QueryJobConfig(
+            dry_run=True, use_query_cache=False, query_parameters=params)
+        dry_job = bq_client.query(query, job_config=dry_config)
+        estimate_gb = (dry_job.total_bytes_processed or 0) / 1e9
+        print(f"[extract] dry-run estimated scan: {estimate_gb:.2f} GB")
+    except GoogleAPIError as err:
+        print(f"[extract] dry-run unavailable: {err}")
+
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     job = bq_client.query(query, job_config=job_config)
-    for row in job.result():
-        yield row["payload"]
+    print(f"[extract] BigQuery job id: {job.job_id}")
+    try:
+        for row in job.result():
+            yield row["payload"]
+    finally:
+        scanned_gb = (job.total_bytes_processed or 0) / 1e9
+        print(f"[extract] query completed, scanned {scanned_gb:.2f} GB")
 
 
 def file_payloads(path: str):
@@ -195,6 +210,12 @@ def file_payloads(path: str):
         line = line.strip()
         if line:
             yield line
+
+
+def rate_per_second(total: int, started_at: float) -> float:
+    """Return messages published per second since a monotonic start time."""
+    elapsed = max(time.monotonic() - started_at, 1e-6)
+    return total / elapsed
 
 
 def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
@@ -221,7 +242,14 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
         Counters with keys 'published', 'failed_to_dlq' and 'total'.
     """
     stats = {"published": 0, "failed_to_dlq": 0, "total": 0}
+    started_at = time.monotonic()
+    last_beat = started_at
     for payload in payloads:
+        now = time.monotonic()
+        if now - last_beat >= 10:
+            elapsed = now - started_at
+            print(f"[publish] heartbeat: {stats} at {rate_per_second(stats['total'], started_at):.1f} ev/s")
+            last_beat = now
         stats["total"] += 1
         data = payload.encode("utf-8")
         published = False
