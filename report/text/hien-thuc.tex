@@ -92,29 +92,29 @@ Trên Windows, cài \texttt{STREAMLIT\_BROWSER\_GATHER\_USAGE\_STATS=false} và 
 
 \subsection{Chạy bằng Docker} 
 
-Dockerfile gói JDK, gcloud SDK, component Pub/Sub Emulator và môi trường Python. Compose tách hai vai trò: service replay chạy publisher/emulator/DirectRunner rồi thoát; service dashboard chạy Streamlit sau khi replay thành công. Kết quả JSONL được giữ qua volume \texttt{build/docker}.
+Dockerfile gói JDK, gcloud SDK, component Pub/Sub Emulator và môi trường Python. Compose tách hai vai trò: service replay chạy publisher/emulator/DirectRunner rồi thoát; service dashboard chạy Streamlit sau khi replay thành công. Kết quả JSONL được giữ qua volume \texttt{build/docker}. \medskip
 
-Chế độ offline dùng fixture chính trong repository:
+Chế độ offline dùng fixture chính trong repository: \medskip
 
 \begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
 GCP_PROJECT_ID=local-project DASHBOARD_DATA_SOURCE=mock \
   PUBLISH_RATE_PER_SEC=0 docker compose up --build
-\end{lstlisting}
+\end{lstlisting} \medskip
 
-Luồng trên BigQuery Sandbox có hai điểm bổ sung bắt buộc. Một là project ID thật và dataset test an toàn. Hai là ADC được mount read-only từ file \texttt{application\_default\_credentials.json}; không copy credentials vào image:
+Luồng sử dụng thêm BigQuery Sandbox có hai điểm bổ sung bắt buộc. Một là project ID thật và dataset test an toàn. Hai là ADC được mount read-only từ file \texttt{application\_default\_credentials.json}; không copy credentials vào image: \medskip
 
 \begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
 ADC_FILE=/mnt/c/path/to/application_default_credentials.json \
 RAW_DATASET=marketing_dss_docker_tutorial \
   docker compose --env-file .env -f docker-compose.yml \
   -f docker-compose.sandbox.yml up --build
-\end{lstlisting}
+\end{lstlisting} \medskip
 
 Dataset test mới giúp tránh ghi đè batch trước. Nếu dùng lại dataset đã có dữ liệu, loader sẽ báo lỗi ở guard thay vì tự xóa bảng; phải đổi dataset hoặc chủ động thêm \texttt{REPLACE\_RAW\_DAY=1} khi chấp nhận thay cả bảng ngày. Dừng toàn bộ service bằng \texttt{docker compose down --remove-orphans}. Giới hạn runtime là 2 GiB và 1.5 CPU cho replay, 1 GiB và 1 CPU cho dashboard; giới hạn này được kiểm tra bằng \texttt{docker inspect} và \texttt{docker stats}.
 
 \subsection{Dữ liệu hiển thị và Looker Studio}
 
-Bản dashboard hiện thực là Streamlit. Người dùng có thể lọc thời gian, kênh, nguồn/medium, thiết bị, quốc gia và các chiều phân tích khác phù hợp từng trang. Các trang bao gồm tổng quan, so sánh hiệu suất, chất lượng kênh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Tab CMO/Manager/Specialist chỉ thay đổi nhóm trang hiển thị; nó không phải lớp phân quyền.
+Bản dashboard hiện thực là Streamlit. Người dùng có thể sử dụng để lọc thời gian, kênh, nguồn/medium, thiết bị, quốc gia và các chiều phân tích khác phù hợp từng trang. Các trang bao gồm tổng quan, so sánh hiệu suất, chất lượng kênh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Tab CMO/Manager/Specialist chỉ thay đổi nhóm trang hiển thị; nó không phải lớp phân quyền. \medskip
 
 Với nhu cầu trình bày bằng Looker Studio trong giới hạn không bật billing, có thể xuất các kết quả tổng hợp thành CSV từ BigQuery Console rồi tải file lên Looker Studio dưới dạng dữ liệu tệp tín. Các view gồm:
 
@@ -124,5 +124,5 @@ Với nhu cầu trình bày bằng Looker Studio trong giới hạn không bật
   \item \texttt{v\_kpi\_conversion\_revenue}
 \end{itemize}
 
-\texttt{event\_date} dùng làm trường ngày, còn kênh và thiết bị làm chiều phân tích. Khi gộp nhiều dòng, tỷ lệ phải được tính lại từ số đếm/doanh thu, không lấy trung bình các tỷ lệ đã tính sẵn. CSV tĩnh là cách chia sẻ snapshot, không phải kết nối live BigQuery phải cập nhật tự động. Cách nối trực tiếp liên quan Billing Project được để phần mở rộng ở kết luận.
+\texttt{event\_date} dùng làm trường ngày, còn kênh và thiết bị làm chiều phân tích. Khi gộp nhiều dòng, tỷ lệ phải được tính lại từ số đếm/doanh thu, không lấy trung bình các tỷ lệ đã tính sẵn. CSV tĩnh là cách chia sẻ snapshot, không phải kết nối live BigQuery phải cập nhật tự động. 
 

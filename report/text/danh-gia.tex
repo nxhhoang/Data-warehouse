@@ -1,4 +1,4 @@
-\section{Evaluation}
+\section{Đánh giá}
 \label{sec:evaluation}
 
 \subsection{Phương pháp kiểm tra}
@@ -45,16 +45,16 @@ Benchmark giới hạn
 
 \subsection{Quota và tài nguyên}
 
-Một replay source của 100 event đầy đủ trong ngày thử ước tính và tiêu thụ 22.47 MiB BigQuery. Con số này khác với kích thước message vì query cần đọc các trường hợp lệ để dựng JSON của record. \texttt{BQ\_MAX\_QUERY\_BYTES=134217728} giới hạn mỗi truy vấn về mức 128 MiB: publisher/dashboard thực hiện dry-run trước và được bảo vệ ở cả lúc thực thi; dbt nhận cùng trần trong profile. Báo cáo theo tháng được đọc từ \texttt{INFORMATION\_SCHEMA.JOBS\_BY\_PROJECT}, không chỉ ước tính từ file log nội bộ.
+Quá trình phát lại (replay) 100 sự kiện đầy đủ từ nguồn dữ liệu trong ngày kiểm thử tiêu tốn 22.47 MiB trên BigQuery. Con số này lớn hơn kích thước thực tế của các thông điệp do truy vấn cần quét toàn bộ các trường hợp lệ để dựng bản ghi JSON. Biến cấu hình \texttt{BQ\_MAX\_QUERY\_BYTES=134217728} giới hạn dung lượng quét của mỗi truy vấn ở mức tối đa 128 MiB: cả publisher và dashboard đều chạy kiểm tra trước (dry-run) lẫn áp trần khi thực thi, trong khi dbt cũng được cấu hình ngưỡng giới hạn tương tự trong profile. Ngoài ra, số liệu sử dụng hằng tháng được trích xuất trực tiếp từ \texttt{INFORMATION\_SCHEMA.JOBS\_BY\_PROJECT} thay vì chỉ ước tính qua tệp nhật ký nội bộ. \medskip
 
-Tại snapshot cuối của bộ kiểm thử, toàn bộ project đã xử lý \textbf{103,485,196 bytes}, khoảng 103.49 MB, tương đương 0.19\% ngân sách tự đặt 50 GiB. Lịch sử job có thể trễ và đây không phải hóa đơn. Ngân sách tự đặt giúp dừng và xem xét trước khi tăng phạm vi dữ liệu, không phải tuyên bố rằng mọi query trong tương lai đều nhỏ.
+Tính đến thời điểm kết thúc đợt kiểm thử, toàn bộ dự án đã xử lý tổng cộng \textbf{103,485,196 bytes} (khoảng 103.49 MB), tương đương 0.19\% hạn mức ngân sách 50 GiB tự đặt. Lưu ý rằng nhật ký lịch sử job của hệ thống có thể cập nhật trễ và số liệu này chỉ mang tính theo dõi chứ không phải hóa đơn thanh toán thực tế. Việc thiết lập trần ngân sách đóng vai trò như một chốt chặn để rà soát trước khi mở rộng quy mô dữ liệu, chứ không bảo đảm mọi truy vấn trong tương lai đều tiêu tốn ít tài nguyên. \medskip
 
-Trong các lần replay Docker, emulator khoảng 211 MiB, pipeline khoảng 212 MiB và dashboard Docker khoảng 86.49 MiB. Watchdog kiểm tra RAM, dung lượng ổ đĩa và PID; native process con trên Windows được dừng theo cây, còn Linux dùng process group cho emulator. Sau replay/dashboard kiểm thử, không còn listener tại 8085 hoặc 8501, cũng không còn container Compose tương ứng.
+Khi chạy kiểm thử replay trên môi trường Docker, mức tiêu thụ RAM ghi nhận được lần lượt là khoảng 211 MiB đối với emulator, 212 MiB cho pipeline và 86.49 MiB cho dashboard. Tiến trình watchdog giám sát liên tục mức sử dụng RAM, dung lượng ổ đĩa và các PID; khi kết thúc, các tiến trình con trên Windows được thu hồi theo cây tiến trình, còn trên Linux sử dụng cơ chế process group cho emulator. Sau khi hoàn tất phiên kiểm thử, hệ thống đã dọn dẹp sạch tài nguyên, không còn tiến trình nào chiếm dụng cổng 8085 hay 8501 cũng như không còn container Compose tồn đọng.
 
 \subsection{Những giới hạn của đánh giá}
 
-Thứ nhất, nguồn GA4 của report trải dài 92 ngày, nhưng phần thử replay chỉ sử dụng 100 event đầu tiên của một ngày. Nó không chứng minh hiệu năng hay quota của full replay 92 ngày. Các số latency trên là đo lần lượt trên mẫu nhỏ nên không được xem là cam kết cho dataset lớn.
+Thứ nhất, dù tập dữ liệu nguồn GA4 kéo dài 92 ngày, kịch bản kiểm thử replay mới chỉ chạy trên 100 sự kiện đầu tiên của một ngày. Kết quả này chưa đủ cơ sở để đánh giá hiệu năng hay mức tiêu thụ quota khi xử lý toàn bộ 92 ngày dữ liệu. Bên cạnh đó, các thông số độ trễ nêu trên được đo tuần tự trên tập mẫu nhỏ nên không thể xem là cam kết hiệu năng cho các tập dữ liệu quy mô lớn. \medskip
 
-Thứ hai, mini-batch không chứa purchase hoặc item. Do đó, kết quả kiểm chứng thiên về luồng thu thập, chuẩn hóa schema và session. Các rule purchase và item vẫn được kiểm tra bởi fixture cục bộ, nhưng chưa có minh chứng doanh thu khác 0 trên dữ liệu thật trong lô Sandbox này. Để trình bày KPI doanh thu có ý nghĩa, cần mở rộng batch kèm đánh giá dry-run và quota riêng.
+Thứ hai, lô dữ liệu thử nghiệm không phát sinh sự kiện mua hàng hay dữ liệu mặt hàng. Vì vậy, đợt kiểm chứng này chủ yếu xác nhận tính đúng đắn của luồng thu thập, chuẩn hóa lược đồ và gom nhóm phiên. Dù các quy tắc xử lý giao dịch và sản phẩm vẫn được kiểm tra qua bộ dữ liệu giả lập (fixture) cục bộ, hệ thống chưa ghi nhận được giao dịch có doanh thu thực tế có giá trị dương trên môi trường Sandbox. Để các chỉ số KPI doanh thu mang lại giá trị phân tích thực tiễn, cần mở rộng quy mô lô dữ liệu thử nghiệm đi kèm bước ước tính chi phí quét (dry-run) và cấp phát quota riêng. \medskip
 
-Cuối cùng, DirectRunner và Pub/Sub Emulator phục vụ kiểm thử cục bộ. Chúng không mô phỏng khả năng lưu trữ bền, IAM hay hiệu suất của dịch vụ phân tán. Sản phẩm Looker CSV là snapshot phục vụ trình bày, chưa phải báo cáo BigQuery live hoàn chỉnh. Các hướng mở rộng về hạ tầng và connector được ghi nhận riêng ở phần kết luận thay vì xem như đã được triển khai.
+Cuối cùng, DirectRunner và Pub/Sub Emulator vốn chỉ phục vụ mục đích kiểm thử trên máy cục bộ, nên không phản ánh được khả năng lưu trữ bền vững, cơ chế phân quyền IAM hay hiệu năng thực tế của các dịch vụ phân tán trên đám mây. Tương tự, tệp xuất CSV cho Looker Studio chỉ là bản chụp dữ liệu tĩnh (snapshot) phục vụ minh họa, chưa phải kết nối trực tiếp (live) tới BigQuery. Các phương án nâng cấp hạ tầng và kết nối dữ liệu tự động này được tách riêng sang phần hướng mở rộng thay vì tính vào phạm vi đã hoàn thiện. \medskip
