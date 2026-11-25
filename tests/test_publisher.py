@@ -40,6 +40,17 @@ class FakePublisher:
         return FakeFuture()
 
 
+class TestFilePayloads:
+    def test_yields_non_empty_lines(self, tmp_path):
+        env_file = tmp_path / "fixture.jsonl"
+        env_file.write_text('{"a": 1}\n\n   \n{"b": 2}\n', encoding="utf-8")
+        assert list(publisher.file_payloads(str(env_file))) == ['{"a": 1}', '{"b": 2}']
+
+    def test_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            list(publisher.file_payloads(str(tmp_path / "nope.jsonl")))
+
+
 class TestToYyyymmdd:
     def test_dashed_date(self):
         assert to_yyyymmdd("2020-11-01") == "20201101"

@@ -5,7 +5,11 @@ each record into a JSON message and replays it through Pub/Sub in event
 timestamp order, simulating online data ingestion.
 
 Usage:
-    python src/extract/publisher.py
+    python src/extract/publisher.py                        # query BigQuery and replay
+    python src/extract/publisher.py --from-file FILE       # publish a local JSONL file;
+                                                           # works with the Pub/Sub emulator
+                                                           # (PUBSUB_EMULATOR_HOST) with no
+                                                           # GCP account at all
 
 Configuration comes from environment variables or the .env file
 (see .env.example): GCP_PROJECT_ID, BQ_SOURCE_DATASET, EXTRACT_START_DATE,
@@ -13,6 +17,7 @@ EXTRACT_END_DATE, EXTRACT_LIMIT, PUBSUB_TOPIC, PUBSUB_DLQ_TOPIC,
 PUBSUB_SUBSCRIPTION.
 """
 
+import argparse
 import os
 import sys
 import time
@@ -169,6 +174,29 @@ def fetch_event_payloads(bq_client: bigquery.Client, source_dataset: str,
         yield row["payload"]
 
 
+def file_payloads(path: str):
+    """Yield each non-empty line of a JSONL file as a Pub/Sub payload.
+
+    The fixture from scripts/make_test_fixture.py uses exactly the message
+    format the pipeline expects, so this path can drive a full local chain
+    against the Pub/Sub emulator without any GCP account.
+
+    Parameters
+    ----------
+    path : str
+        Path to a JSONL file, one event per line.
+
+    Yields
+    ------
+    str
+        One JSON string per line, blank lines skipped.
+    """
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            yield line
+
+
 def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
                 dlq_path: str, payloads) -> dict:
     """Publish every payload, routing persistent failures to the dead-letter topic.
@@ -220,33 +248,46 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
 
 
 def main() -> int:
-    """Replay GA4 events from BigQuery into Pub/Sub; returns an exit code."""
+    """Replay GA4 events into Pub/Sub (from BigQuery or a local JSONL file)."""
+    parser = argparse.ArgumentParser(
+        description="Replay GA4 events into Pub/Sub (real service or emulator).")
+    parser.add_argument("--from-file", default=None, metavar="PATH",
+                        help="publish each line of this JSONL file instead of "
+                             "querying BigQuery (e.g. tests/fixtures/"
+                             "ga4_events_sample.jsonl)")
+    args = parser.parse_args()
+
     load_env_file()
     project_id = get_setting("GCP_PROJECT_ID", "")
     if not project_id:
         print("Missing GCP_PROJECT_ID (see .env.example)")
         return 1
-    source_dataset = get_setting(
-        "BQ_SOURCE_DATASET",
-        "bigquery-public-data.ga4_obfuscated_sample_ecommerce",
-    )
-    start_date = to_yyyymmdd(get_setting("EXTRACT_START_DATE", "20201101"))
-    end_date = to_yyyymmdd(get_setting("EXTRACT_END_DATE", "20210131"))
-    limit = int(get_setting("EXTRACT_LIMIT", "0"))
     topic_id = get_setting("PUBSUB_TOPIC", "ga4-events")
     dlq_topic_id = get_setting("PUBSUB_DLQ_TOPIC", "ga4-events-dlq")
     subscription_id = get_setting("PUBSUB_SUBSCRIPTION", f"{topic_id}-sub")
 
-    bq_client = bigquery.Client(project=project_id)
     publisher = pubsub_v1.PublisherClient()
     setup_pubsub(publisher, project_id, topic_id, dlq_topic_id, subscription_id)
 
     topic_path = publisher.topic_path(project_id, topic_id)
     dlq_path = publisher.topic_path(project_id, dlq_topic_id)
-    print(f"[extract] replaying events from {source_dataset} "
-          f"({start_date} -> {end_date}, limit={limit or 'none'})")
 
-    payloads = fetch_event_payloads(bq_client, source_dataset, start_date, end_date, limit)
+    if args.from_file:
+        print(f"[extract] replaying events from file {args.from_file}")
+        payloads = file_payloads(args.from_file)
+    else:
+        source_dataset = get_setting(
+            "BQ_SOURCE_DATASET",
+            "bigquery-public-data.ga4_obfuscated_sample_ecommerce",
+        )
+        start_date = to_yyyymmdd(get_setting("EXTRACT_START_DATE", "20201101"))
+        end_date = to_yyyymmdd(get_setting("EXTRACT_END_DATE", "20210131"))
+        limit = int(get_setting("EXTRACT_LIMIT", "0"))
+        print(f"[extract] replaying events from {source_dataset} "
+              f"({start_date} -> {end_date}, limit={limit or 'none'})")
+        bq_client = bigquery.Client(project=project_id)
+        payloads = fetch_event_payloads(bq_client, source_dataset, start_date, end_date, limit)
+
     stats = publish_all(publisher, topic_path, dlq_path, payloads)
     print(f"[extract] finished: {stats}")
     return 0

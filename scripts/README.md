@@ -10,11 +10,13 @@ from the repository root.
 |---|---|---|
 | `setup_venv.sh` | setup | Create and populate the `.venv` virtual environment |
 | `run_simulation.sh` | all (local) | Full simulation chain: fixture → dry-run → verify → quality-log export |
+| `run_emulator_chain.sh` | all (local) | Same chain but through the local Pub/Sub emulator (no billing) |
 | `make_test_fixture.py` | 3 — Transform | Generate the GA4-like JSONL fixture used by the dry-run |
 | `rebuild_warehouse.sh` | 3–4 — Transform + Warehouse | Recompile channels, rebuild all dbt models, run tests, deploy KPI views |
 | `compile_channel_macro.py` | 4 — Warehouse | Compile `config/channels.yaml` into the `map_channel` dbt macro |
 | `verify_dry_run.py` | 3 — Transform | Check dry-run outputs against the expected fixture routing |
 | `export_quality_log.py` | quality | Export the quality log (BigQuery table or dry-run JSONL) to CSV |
+| `load_raw_to_bigquery.py` | 4 — Warehouse | Upload local pipeline JSONL outputs into BigQuery raw tables (no GCS) |
 
 ## setup_venv.sh
 
@@ -45,6 +47,19 @@ bash scripts/run_simulation.sh
 
 This is the exact chain the GitHub Actions workflow
 (`ci-tests.yml`) runs on every branch after the unit tests.
+
+## run_emulator_chain.sh
+
+The **level 4c** chain (see `docs/runbook.md` section 4c): same simulation
+flow as `run_simulation.sh`, but the publisher and pipeline talk through the
+official Pub/Sub emulator (`gcloud beta emulators pubsub`) instead of files.
+Requires the gcloud CLI with the `pubsub-emulator` component and Java 8+.
+No billing, no GCP account (the publisher runs in `--from-file` mode).
+
+```bash
+gcloud components install pubsub-emulator   # one-time
+bash scripts/run_emulator_chain.sh
+```
 
 ## make_test_fixture.py
 
@@ -128,3 +143,18 @@ python scripts/export_quality_log.py --start-date 2020-11-01 --end-date 2021-01-
 
 Options: `--out` (output directory), `--project` / `--raw-dataset` for the
 BigQuery mode (default to `GCP_PROJECT_ID` / `RAW_DATASET` env vars).
+
+## load_raw_to_bigquery.py
+
+Uploads the local pipeline JSONL outputs into the BigQuery raw tables
+`events_YYYYMMDD` using client-side load jobs (`load_table_from_file`).
+Needs no GCS bucket and works inside the BigQuery Sandbox without billing —
+this is the bridge that turns an emulator-chain (or dry-run) output into a
+real warehouse build. Each day is loaded with `WRITE_TRUNCATE`, so re-running
+the chain and this script is idempotent per day.
+
+```bash
+python scripts/load_raw_to_bigquery.py --from-jsonl build/emulator_run
+# then point dbt at the raw dataset (BQ_RAW_PROJECT/BQ_RAW_DATASET in .env)
+# and run scripts/rebuild_warehouse.sh
+```
