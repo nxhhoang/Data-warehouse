@@ -41,7 +41,7 @@ def read_registrations(pid_dir: Path) -> list[dict]:
     registrations = []
     for path in sorted(pid_dir.glob("*.json")):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
             if isinstance(data.get("pid"), int):
                 registrations.append(data)
         except (OSError, ValueError):

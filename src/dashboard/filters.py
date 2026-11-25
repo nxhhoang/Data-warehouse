@@ -73,8 +73,9 @@ def render_sidebar(df: pd.DataFrame) -> Filters:
     min_date = df["session_date"].min().date()
     max_date = df["session_date"].max().date()
 
-    st.sidebar.header("Bộ lọc", help="Chức năng 2: áp dụng cho mọi trang.")
-    picked = st.sidebar.date_input(
+    panel = st.sidebar.expander("Bộ lọc", expanded=False)
+    panel.caption("Chức năng 2: áp dụng cho mọi trang.")
+    picked = panel.date_input(
         "Khoảng thời gian", value=(min_date, max_date),
         min_value=min_date, max_value=max_date, format="DD/MM/YYYY", key="f_dates",
     )
@@ -82,19 +83,19 @@ def render_sidebar(df: pd.DataFrame) -> Filters:
     start, end = (picked if isinstance(picked, tuple) and len(picked) == 2
                   else (min_date, max_date))
 
-    channels = st.sidebar.multiselect(
+    channels = panel.multiselect(
         "Kênh", _ordered(df["channel_group"], CHANNEL_GROUPS),
         placeholder="Tất cả kênh", key="f_channels",
     )
-    devices = st.sidebar.multiselect(
+    devices = panel.multiselect(
         "Thiết bị", _ordered(df["device_category"], DEVICE_CATEGORIES),
         placeholder="Tất cả thiết bị", key="f_devices",
     )
-    countries = st.sidebar.multiselect(
+    countries = panel.multiselect(
         "Quốc gia", df["country"].value_counts().index.tolist(),
         placeholder="Tất cả quốc gia", key="f_countries",
     )
-    user_type = st.sidebar.radio("Loại người dùng", USER_TYPES, key="f_user_type")
+    user_type = panel.radio("Loại người dùng", USER_TYPES, key="f_user_type")
 
     return Filters(
         start=pd.Timestamp(start), end=pd.Timestamp(end),

@@ -126,15 +126,6 @@ def make_sessions(n_sessions: int = 80_000, seed: int = SEED) -> pd.DataFrame:
     is_new = new_user_by_key[user_key]
     prior_sessions = np.where(is_new, 0, rng.integers(1, 6, size=n_users + 1)[user_key])
 
-    # Order each user's sessions in time: the first one holds first_visit when
-    # the user is new; returning users already had 1-5 sessions before Nov 1
-    order = pd.DataFrame({"user_key": user_key, "date": session_date}).sort_values(
-        ["user_key", "date"], kind="stable")
-    nth = np.empty(n, dtype=int)
-    nth[order.index.to_numpy()] = order.groupby("user_key").cumcount().to_numpy() + 1
-    is_new = new_user_by_key[user_key]
-    prior_sessions = np.where(is_new, 0, rng.integers(1, 6, size=n_users + 1)[user_key])
-
     return pd.DataFrame({
         "session_id": [f"mock-{i:07d}" for i in range(n)],
         "user_key": user_key,

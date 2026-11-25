@@ -44,11 +44,16 @@ def default_periods(start: pd.Timestamp, end: pd.Timestamp,
 
     B is the selected range and A the period before it (kpi.previous_period).
     When A would start before the data, the selected range is split into
-    two halves instead.
+    two halves instead. A one-day boundary range keeps its own date for B
+    and leaves A outside the data window, since it has no earlier relative
+    period to compare against.
     """
     prev = kpi.previous_period(start, end)
     if prev[0] >= data_start:
         return prev, (start, end)
+    if start == end:
+        # A one-day range at the data boundary cannot be split into two halves.
+        return (start - pd.Timedelta(days=1), start), (start, end)
     days = (end - start).days + 1
     half = max(days // 2, 1)
     mid = start + pd.Timedelta(days=half - 1)

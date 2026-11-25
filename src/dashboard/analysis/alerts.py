@@ -104,7 +104,11 @@ def evaluate(previous: pd.DataFrame, current: pd.DataFrame, by: str,
                                    SERIOUS if crossed >= 2 * limit else WARNING))
         traffic = kpi.relative_change(c["sessions"], p["sessions"])
         cr_change = kpi.relative_change(c["conversion_rate"], p["conversion_rate"])
-        if traffic >= thresholds.spike and not (cr_change > 0):
+        # Zero baseline is a special case: relative_change is undefined, so use
+        # absolute conversion instead of letting NaN look like "no gain".
+        no_gain = (c["conversion_rate"] <= p["conversion_rate"]
+                   if p["conversion_rate"] == 0 else not (cr_change > 0))
+        if traffic >= thresholds.spike and no_gain:
             rows.append(_alert(group, SPIKE_RULE, "sessions", p["sessions"], c["sessions"], traffic,
                                SERIOUS if traffic >= 2 * thresholds.spike else WARNING))
     out = pd.DataFrame(rows, columns=["group", "rule", "kpi_id", "previous", "current",

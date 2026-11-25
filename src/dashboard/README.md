@@ -47,6 +47,22 @@ restart the command if a changed module is not reloaded.
 | `mock` (default) | Synthetic data from `mock.py` | Nothing |
 | `bigquery` | `core.fct_sessions` + dims, `marts.fct_product_channel_daily` + dims | `GCP_PROJECT_ID`, `gcloud auth application-default login`, warehouse built by `scripts/rebuild_warehouse.sh` |
 
+## Management views
+
+The sidebar has four management tabs: **Tất cả**, **CMO**, **Manager**, and
+**Specialist**. They filter only the navigation pages, not access control; the
+shared filters remain available to every role.
+
+- **CMO**: 1. Tổng quan, 3. So sánh, 4. Chất lượng kênh, 8. Cảnh báo,
+  9. Mô phỏng, 10. Truy vết.
+- **Manager**: 3. So sánh, 4. Chất lượng kênh, 6. Chi tiết, 8. Cảnh báo,
+  9. Mô phỏng, 10. Truy vết.
+- **Specialist**: 5. Phễu, 6. Chi tiết, 7. Phân khúc, 10. Truy vết.
+
+Choosing a new role opens that role's first page. Choosing a role whose set
+includes the current page keeps user context. Definitions are centralized in
+`src/dashboard/roles.py`, with tests in `tests/test_dashboard_roles.py`.
+
 ## Layout
 
 | File | Role |
