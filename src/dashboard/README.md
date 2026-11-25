@@ -90,7 +90,8 @@ restart the command if a changed module is not reloaded.
   purchase has transaction_id `(not set)`) and 26–31/01/2021 (232 of 282 purchases lack a
   transaction_id and the source revenue nearly stops). 883 purchases with `(not set)` (USD
   31,817) are excluded over the 92 days. `kpi.data_gap_note` returns the caption pages show
-  when a range touches a gap.
+  when a range touches a gap: one short sentence on analysis pages, the full explanation
+  (`detailed=True`) on the traceability page.
 - In the obfuscated data the items viewed/added to cart and the items purchased are almost
   disjoint catalogues (4 of 427 viewed item_ids were sold), so the funnel has no
   per-product view → purchase rate.

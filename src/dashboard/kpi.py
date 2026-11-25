@@ -103,12 +103,16 @@ def summarize(df: pd.DataFrame) -> dict[str, float]:
 # revenue fall for data reasons rather than business ones. Counts from the raw
 # GA4 tables: 883 purchases over the 92 days have transaction_id '(not set)'
 # (USD 31,817 excluded by the valid-order rule).
+# Each gap: first day, last day, short phrase for analysis pages, full detail
+# for the traceability page.
 DATA_GAPS = (
     (pd.Timestamp("2020-11-01"), pd.Timestamp("2020-11-10"),
+     "bằng 0 ngày 01–10/11/2020",
      "01–10/11/2020: mọi sự kiện purchase trong dữ liệu gốc có transaction_id '(not set)', nên "
      "không có giao dịch hợp lệ; đơn hàng và doanh thu các ngày này bằng 0 do quy tắc lọc, không "
      "phải do sụt giảm thật."),
     (pd.Timestamp("2021-01-26"), pd.Timestamp("2021-01-31"),
+     "giảm mạnh 26–31/01/2021",
      "26–31/01/2021: dữ liệu gốc ngừng ghi nhận giao dịch bình thường (232/282 purchase không có "
      "transaction_id, tổng doanh thu gốc 6 ngày chỉ 2.193 USD so với 3.000–6.700 USD/ngày trước "
      "đó); mức giảm đơn hàng và doanh thu ở cuối kỳ là do dữ liệu, không phải do kinh doanh."),
@@ -117,10 +121,21 @@ ORDER_KPIS = ("orders", "conversion_rate", "revenue_usd", "aov_usd",
               "revenue_per_session_usd", "revenue_per_user_usd", "purchase_completion_rate")
 
 
-def data_gap_note(start: pd.Timestamp, end: pd.Timestamp) -> str | None:
-    """Warning text for every data gap that [start, end] overlaps, or None."""
-    notes = [text for first, last, text in DATA_GAPS if not (start > last or end < first)]
-    return " ".join(notes) or None
+def data_gap_note(start: pd.Timestamp, end: pd.Timestamp,
+                  detailed: bool = False) -> str | None:
+    """Warning text for every data gap that [start, end] overlaps, or None.
+
+    The default is one short sentence for analysis pages; ``detailed=True``
+    gives the full explanation with source counts (traceability page).
+    """
+    hits = [gap for gap in DATA_GAPS if not (start > gap[1] or end < gap[0])]
+    if not hits:
+        return None
+    if detailed:
+        return " ".join(detail for *_, detail in hits)
+    return ("Đơn hàng và doanh thu " + " và ".join(short for _, _, short, _ in hits)
+            + " do dữ liệu nguồn thiếu mã giao dịch, không phải do kinh doanh. "
+            "Chi tiết ở trang Truy vết số liệu.")
 
 
 def time_series(df: pd.DataFrame, kpi_id: str, grain: str) -> pd.DataFrame:

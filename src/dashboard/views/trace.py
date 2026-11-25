@@ -29,7 +29,7 @@ def _filter_summary(ctx: PageContext) -> str:
 
 def _quality_notes(ctx: PageContext, kpi_id: str) -> list[str]:
     notes = list(kpi.kpi_dictionary()[kpi_id].get("caveats", []))
-    order_note = kpi.data_gap_note(ctx.filters.start, ctx.filters.end)
+    order_note = kpi.data_gap_note(ctx.filters.start, ctx.filters.end, detailed=True)
     if order_note and kpi_id in kpi.ORDER_KPIS:
         notes.append(order_note)
     if kpi_id in kpi.CART_DEPENDENT and not any("18/92" in n for n in notes):

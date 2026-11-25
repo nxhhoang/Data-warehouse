@@ -418,5 +418,16 @@ def test_verification_sql_applies_every_filter():
 
 
 def test_data_gap_note_lists_every_overlapping_gap():
-    note = kpi.data_gap_note(pd.Timestamp("2020-11-01"), pd.Timestamp("2021-01-31"))
-    assert "01–10/11/2020" in note and "26–31/01/2021" in note
+    for detailed in (False, True):
+        note = kpi.data_gap_note(pd.Timestamp("2020-11-01"), pd.Timestamp("2021-01-31"),
+                                 detailed=detailed)
+        assert "01–10/11/2020" in note and "26–31/01/2021" in note
+
+
+def test_data_gap_note_short_by_default_detailed_on_request():
+    start, end = pd.Timestamp("2021-01-20"), pd.Timestamp("2021-01-31")
+    short = kpi.data_gap_note(start, end)
+    detailed = kpi.data_gap_note(start, end, detailed=True)
+    assert "01–10/11/2020" not in short
+    assert "232/282" in detailed and "232/282" not in short
+    assert len(short) < len(detailed)
