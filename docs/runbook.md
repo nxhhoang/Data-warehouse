@@ -211,7 +211,7 @@ python scripts/export_quality_log.py --from-jsonl build/pipeline_dry_run
 | `dbt debug` báo không tìm thấy profile | Chưa copy `profiles.yml.example` thành `profiles.yml` trong `src/warehouse/`, hoặc thiếu `--profiles-dir .` |
 | BigQuery từ chối streaming inserts | Sandbox không hỗ trợ; giữ `--write_method=FILE_LOADS` (mặc định) |
 | Bảng raw "biến mất" sau ~60 ngày | Sandbox xóa bảng sau 60 ngày; chạy lại `scripts/rebuild_warehouse.sh` (kịch bản tái tạo kho là sản phẩm bắt buộc, khảo sát mục 4) |
-| Lỗi `_TABLE_SUFFIX` không hoạt động | Wildcard table bị quote; đã tắt quoting trong `sources.yml`, kiểm tra file chưa bị chỉnh lại |
+| `Syntax error: Expected ")" but got "*"` ở `stg_ga4_events` | Tên bảng wildcard `events_*` phải nằm trong backtick; giữ `quoting.identifier: true` trong `sources.yml` |
 | Publisher báo 403 trên dead-letter policy | Thiếu IAM cho service account Pub/Sub trên topic DLQ (lệnh cấp quyền ở mục 5) |
 | Dry-run sai số lượng sự kiện | Chạy `python scripts/verify_dry_run.py` để xem chi tiết dòng nào lệch; fixture kỳ vọng 4/2/4 như mục 3 |
 | Emulator chain FAIL sau 120 giây | Beam chưa nói chuyện được với emulator: thử `--direct_running_mode=in_memory`; không được thì lùi về file mode (mục 3); chi tiết ở mục 4c |

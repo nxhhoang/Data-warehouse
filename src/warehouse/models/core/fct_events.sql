@@ -1,6 +1,10 @@
+{# Partitioning is off by default: BigQuery Sandbox expires partitions older than
+   60 days, so 2020 partitions would be deleted as soon as they are written.
+   Enable with --vars '{partition_tables: true}' on a billing-enabled project. #}
 {{
     config(
-        partition_by={"field": "event_date", "data_type": "date"},
+        partition_by=({"field": "event_date", "data_type": "date"}
+                      if var("partition_tables", false) else none),
         cluster_by=["event_key", "traffic_source_key"]
     )
 }}
