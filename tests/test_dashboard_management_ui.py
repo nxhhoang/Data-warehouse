@@ -8,24 +8,24 @@ APP = Path(__file__).parents[1] / "src" / "dashboard" / "app.py"
 EXPECTATIONS = {
     "all": (
         "Tổng quan điều hành",
-        ["1. Tổng quan", "3. So sánh hiệu suất", "4. Chất lượng kênh",
-         "5. Phễu chuyển đổi", "6. Phân tích chi tiết", "7. Phân khúc khách hàng",
-         "8. Cảnh báo theo ngưỡng", "9. Mô phỏng kịch bản", "10. Truy vết số liệu"],
+        ["Tổng quan", "So sánh hiệu suất", "Chất lượng kênh",
+         "Phễu chuyển đổi", "Phân tích chi tiết", "Phân khúc khách hàng",
+         "Cảnh báo theo ngưỡng", "Mô phỏng kịch bản", "Truy vết số liệu"],
     ),
     "cmo": (
         "Tổng quan điều hành",
-        ["1. Tổng quan", "3. So sánh hiệu suất", "4. Chất lượng kênh",
-         "8. Cảnh báo theo ngưỡng", "9. Mô phỏng kịch bản", "10. Truy vết số liệu"],
+        ["Tổng quan", "So sánh hiệu suất", "Chất lượng kênh",
+         "Cảnh báo theo ngưỡng", "Mô phỏng kịch bản", "Truy vết số liệu"],
     ),
     "manager": (
         "So sánh hiệu suất",
-        ["3. So sánh hiệu suất", "4. Chất lượng kênh", "6. Phân tích chi tiết",
-         "8. Cảnh báo theo ngưỡng", "9. Mô phỏng kịch bản", "10. Truy vết số liệu"],
+        ["So sánh hiệu suất", "Chất lượng kênh", "Phân tích chi tiết",
+         "Cảnh báo theo ngưỡng", "Mô phỏng kịch bản", "Truy vết số liệu"],
     ),
     "specialist": (
         "Phễu chuyển đổi",
-        ["5. Phễu chuyển đổi", "6. Phân tích chi tiết",
-         "7. Phân khúc khách hàng", "10. Truy vết số liệu"],
+        ["Phễu chuyển đổi", "Phân tích chi tiết",
+         "Phân khúc khách hàng", "Truy vết số liệu"],
     ),
 }
 

@@ -61,15 +61,15 @@ def main() -> None:
         return st.Page(fn, title=title, url_path=url_path, **kwargs)
 
     registry = [
-        ("tong-quan", "1. Tổng quan", overview.render),
-        ("so-sanh", "3. So sánh hiệu suất", compare.render),
-        ("chat-luong-kenh", "4. Chất lượng kênh", channel_quality.render),
-        ("pheu", "5. Phễu chuyển đổi", funnel.render),
-        ("chi-tiet", "6. Phân tích chi tiết", drilldown.render),
-        ("phan-khuc", "7. Phân khúc khách hàng", segments.render),
-        ("canh-bao", "8. Cảnh báo theo ngưỡng", alerts.render),
-        ("mo-phong", "9. Mô phỏng kịch bản", scenario.render),
-        ("truy-vet", "10. Truy vết số liệu", trace.render),
+        ("tong-quan", "Tổng quan", overview.render),
+        ("so-sanh", "So sánh hiệu suất", compare.render),
+        ("chat-luong-kenh", "Chất lượng kênh", channel_quality.render),
+        ("pheu", "Phễu chuyển đổi", funnel.render),
+        ("chi-tiet", "Phân tích chi tiết", drilldown.render),
+        ("phan-khuc", "Phân khúc khách hàng", segments.render),
+        ("canh-bao", "Cảnh báo theo ngưỡng", alerts.render),
+        ("mo-phong", "Mô phỏng kịch bản", scenario.render),
+        ("truy-vet", "Truy vết số liệu", trace.render),
     ]
     visible_paths = allowed_paths(role)
     ctx.pages = {
