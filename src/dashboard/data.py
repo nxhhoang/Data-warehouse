@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from src.dashboard.config import Settings
+from src.extract.bigquery_usage import DEFAULT_USAGE_LOG, prepare_query, record_job
 
 # Column name -> pandas dtype. Both sources are coerced to exactly this schema.
 SESSION_COLUMNS = {
@@ -187,14 +188,21 @@ def derive_session_columns(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _query_bigquery(sql: str, project_id: str) -> pd.DataFrame:
+def _query_bigquery(sql: str, project_id: str,
+                    max_query_bytes: int = 128 * 1024**2,
+                    usage_log=DEFAULT_USAGE_LOG) -> pd.DataFrame:
     if not project_id:
         raise ValueError("GCP_PROJECT_ID is empty; set it in .env to read BigQuery")
     # Imported lazily so the mock mode and the tests need no GCP packages
     from google.cloud import bigquery
 
     client = bigquery.Client(project=project_id)
-    return client.query(sql.format(project=project_id)).to_dataframe()
+    job = prepare_query(client, sql.format(project=project_id), None,
+                        max_query_bytes, "dashboard", usage_log)
+    try:
+        return job.to_dataframe()
+    finally:
+        record_job(job, "dashboard", usage_log)
 
 
 def run_query(settings: Settings, sql: str, params: list[tuple]) -> pd.DataFrame:
@@ -215,14 +223,19 @@ def run_query(settings: Settings, sql: str, params: list[tuple]) -> pd.DataFrame
         for n, t, v in params
     ]
     client = bigquery.Client(project=settings.project_id)
-    job = client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=query_params))
-    return job.to_dataframe()
+    job = prepare_query(client, sql, query_params, settings.max_query_bytes,
+                        "dashboard_trace", settings.usage_log)
+    try:
+        return job.to_dataframe()
+    finally:
+        record_job(job, "dashboard_trace", settings.usage_log)
 
 
 def load_sessions(settings: Settings) -> pd.DataFrame:
     """Load the session-level frame from the configured source."""
     if settings.data_source == "bigquery":
-        raw = _query_bigquery(SESSIONS_SQL, settings.project_id)
+        raw = _query_bigquery(SESSIONS_SQL, settings.project_id,
+                              settings.max_query_bytes, settings.usage_log)
     else:
         from src.dashboard.mock import make_sessions
 
@@ -233,7 +246,8 @@ def load_sessions(settings: Settings) -> pd.DataFrame:
 def load_products(settings: Settings) -> pd.DataFrame:
     """Load the date × product × channel × device frame from the configured source."""
     if settings.data_source == "bigquery":
-        raw = _query_bigquery(PRODUCTS_SQL, settings.project_id)
+        raw = _query_bigquery(PRODUCTS_SQL, settings.project_id,
+                              settings.max_query_bytes, settings.usage_log)
     else:
         from src.dashboard.mock import make_products
 

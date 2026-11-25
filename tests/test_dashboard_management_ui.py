@@ -2,7 +2,14 @@
 
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
+
+
+@pytest.fixture(autouse=True)
+def use_mock_dashboard(monkeypatch):
+    """Keep UI tests local even when the developer's .env uses BigQuery."""
+    monkeypatch.setenv("DASHBOARD_DATA_SOURCE", "mock")
 
 APP = Path(__file__).parents[1] / "src" / "dashboard" / "app.py"
 EXPECTATIONS = {

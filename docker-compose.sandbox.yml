@@ -1,0 +1,19 @@
+services:
+  replay:
+    environment:
+      REPLAY_SOURCE_FILE: ""
+      LOAD_RAW: "1"
+      BUILD_WAREHOUSE: "1"
+      PUBLISH_RATE_PER_SEC: ${PUBLISH_RATE_PER_SEC:-10}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-adc.json
+    volumes:
+      - ${ADC_FILE:?Set ADC_FILE to application_default_credentials.json}:/run/secrets/google-adc.json:ro
+      - ./build/docker:/app/build
+
+  dashboard:
+    environment:
+      DASHBOARD_DATA_SOURCE: bigquery
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-adc.json
+    volumes:
+      - ${ADC_FILE:?Set ADC_FILE to application_default_credentials.json}:/run/secrets/google-adc.json:ro
+      - ./build/docker:/app/build

@@ -10,10 +10,16 @@ import os
 import sys
 from pathlib import Path
 
+from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
 
 KPI_DIR = Path(__file__).resolve().parent
 REPO_ROOT = KPI_DIR.parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.extract.bigquery_usage import prepare_query, record_job  # noqa: E402
+
 VIEW_FILES = [
     "v_kpi_traffic_engagement.sql",
     "v_kpi_funnel.sql",
@@ -44,16 +50,24 @@ def main() -> int:
 
     client = bigquery.Client(project=project_id)
     dataset_ref = bigquery.Dataset(f"{project_id}.{KPI_DATASET}")
+    dataset_ref.location = "US"
     try:
         client.get_dataset(dataset_ref)
-    except Exception:
+    except NotFound:
         client.create_dataset(dataset_ref)
         print(f"[kpi] created dataset {KPI_DATASET}")
 
+    max_query_bytes = int(os.environ.get(
+        "BQ_MAX_QUERY_BYTES", str(128 * 1024**2)))
+    usage_log = os.environ.get("BQ_USAGE_LOG", "build/bigquery_usage.jsonl")
     for filename in VIEW_FILES:
         sql = (KPI_DIR / filename).read_text(encoding="utf-8")
         sql = sql.replace("${PROJECT_ID}", project_id)
-        client.query(sql).result()
+        job = prepare_query(client, sql, None, max_query_bytes, "kpi_view", usage_log)
+        try:
+            job.result()
+        finally:
+            record_job(job, "kpi_view", usage_log)
         print(f"[kpi] deployed {KPI_DATASET}.{filename[:-4]}")
     return 0
 

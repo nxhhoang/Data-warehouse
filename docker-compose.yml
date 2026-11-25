@@ -1,0 +1,57 @@
+services:
+  replay:
+    image: ${DOCKER_IMAGE:-ga4-replay:latest}
+    build:
+      context: .
+      args:
+        CLOUD_SDK_VERSION: 594.0.1
+    command: replay
+    environment: &runtime-environment
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-local-project}
+      BQ_QUERY_PROJECT: ${GCP_PROJECT_ID:-local-project}
+      BQ_SOURCE_DATASET: ${BQ_SOURCE_DATASET:-bigquery-public-data.ga4_obfuscated_sample_ecommerce}
+      BQ_RAW_PROJECT: ${GCP_PROJECT_ID:-local-project}
+      BQ_RAW_DATASET: ${RAW_DATASET:-marketing_dss_raw}
+      RAW_DATASET: ${RAW_DATASET:-marketing_dss_raw}
+      EXTRACT_START_DATE: ${EXTRACT_START_DATE:-2020-11-01}
+      EXTRACT_END_DATE: ${EXTRACT_END_DATE:-2020-11-01}
+      EXTRACT_LIMIT: ${EXTRACT_LIMIT:-100}
+      PUBLISH_RATE_PER_SEC: ${PUBLISH_RATE_PER_SEC:-0}
+      BQ_MAX_QUERY_BYTES: ${BQ_MAX_QUERY_BYTES:-134217728}
+      BQ_USAGE_LOG: build/bigquery_usage.jsonl
+      BQ_MONTHLY_SCAN_BUDGET_GIB: ${BQ_MONTHLY_SCAN_BUDGET_GIB:-50}
+      REPLAY_SOURCE_FILE: ${REPLAY_SOURCE_FILE:-tests/fixtures/ga4_events_sample.jsonl}
+      LOAD_RAW: ${LOAD_RAW:-0}
+      REPLACE_RAW_DAY: ${REPLACE_RAW_DAY:-0}
+      BUILD_WAREHOUSE: ${BUILD_WAREHOUSE:-0}
+      DASHBOARD_DATA_SOURCE: ${DASHBOARD_DATA_SOURCE:-mock}
+      DASHBOARD_PORT: 8501
+      PIPELINE_EXTRA_ARGS: --direct_num_workers=1
+    volumes:
+      - ./build/docker:/app/build
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 1.5
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 15s
+
+  dashboard:
+    image: ${DOCKER_IMAGE:-ga4-replay:latest}
+    command: dashboard
+    depends_on:
+      replay:
+        condition: service_completed_successfully
+    environment: *runtime-environment
+    volumes:
+      - ./build/docker:/app/build
+    ports:
+      - "127.0.0.1:8501:8501"
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 10s

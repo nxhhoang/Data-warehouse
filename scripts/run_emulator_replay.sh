@@ -7,14 +7,16 @@
 #   - publisher.py, querying BigQuery in the foreground
 #   - watch_resources.py, reporting RAM and free disk every 15 seconds
 #
-# The publisher keeps its existing speed: this run validates correctness, not
-# throughput. There is deliberately no rate flag or async batch publishing.
+# PUBLISH_RATE_PER_SEC in .env controls replay pacing. Pipeline concurrency can
+# be lowered with PIPELINE_EXTRA_ARGS="--direct_num_workers=1".
 #
 # Prerequisites: gcloud CLI + Java 8+, `gcloud components install pubsub-emulator`,
 # .env and ADC credentials for the real BigQuery data source.
 #
 # Usage:
-#   bash scripts/run_emulator_replay.sh [--load] [--timeout 1800] [--window 600]
+#   bash scripts/run_emulator_replay.sh [--load] [--timeout 1800] [--window 600] \
+#       [--from-file tests/fixtures/ga4_events_sample.jsonl]
+#     --from-file use an offline JSONL fixture instead of querying BigQuery
 #     --load      after replay, upload output to the REAL raw dataset on BigQuery
 #     --timeout   maximum seconds to wait for stabilized output (default 1800)
 #     --window    fixed dedup window in seconds (default 600)
@@ -25,18 +27,22 @@ EMULATOR_PROJECT=local-project
 EMULATOR_PORT=8085
 RUN_DIR=build/emulator_replay
 PID_DIR="$RUN_DIR/pids"
-OUT_DIR="$RUN_DIR/output"
+OUT_DIR="${REPLAY_OUTPUT_DIR:-$RUN_DIR/output}"
 TIMEOUT=1800
 DEDUP_WINDOW=600
 LOAD=0
+REPLACE_DAY=0
+SOURCE_FILE=""
 MONITOR_PID=""
 PIPELINE_PID=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --load) LOAD=1; shift ;;
+    --replace-day) REPLACE_DAY=1; shift ;;
     --timeout) TIMEOUT="$2"; shift 2 ;;
     --window) DEDUP_WINDOW="$2"; shift 2 ;;
+    --from-file) SOURCE_FILE="$2"; shift 2 ;;
     *) echo "Unknown argument: $1"; exit 2 ;;
   esac
 done
@@ -51,6 +57,19 @@ fi
 
 register_pid() {
   printf '{"pid": %s, "label": "%s", "token": "%s"}\n' "$1" "$2" "$3" > "$PID_DIR/$2.json"
+}
+
+register_native_pid() {
+  local native_pid="$1"
+  if [ "${OS:-}" = "Windows_NT" ]; then
+    # ps without -o returns PID PPID PGID WINPID for a Git-Bash child.
+    native_pid=$(ps -p "$1" | awk 'NR == 2 {print $4}')
+  fi
+  if ! [[ "$native_pid" =~ ^[0-9]+$ ]]; then
+    echo "Cannot resolve native Windows PID for $2" >&2
+    return 1
+  fi
+  register_pid "$native_pid" "$2" "$3"
 }
 
 cleanup() {
@@ -73,11 +92,32 @@ if [ -f .env ]; then
   . ./.env
   set +a
 fi
-if [ "${EXTRACT_LIMIT:-0}" = "0" ]; then
-  echo "[replay] EXTRACT_LIMIT=0: full 92-day replay. Keep this terminal open;"
-  echo "         the existing publisher is intentionally slow during validation."
+if [ -n "$SOURCE_FILE" ] && [ ! -f "$SOURCE_FILE" ]; then
+  echo "[replay] Missing source fixture: $SOURCE_FILE"
+  exit 1
+fi
+if [ -z "$SOURCE_FILE" ]; then
+  if [ -z "${GCP_PROJECT_ID:-}" ] || [ "$GCP_PROJECT_ID" = "local-project" ] \
+          || [ "$GCP_PROJECT_ID" = "your-project-id" ]; then
+    echo "[replay] Set a real GCP_PROJECT_ID in .env before replaying BigQuery data."
+    exit 1
+  fi
+fi
+export GCP_PROJECT_ID="${GCP_PROJECT_ID:-local-project}"
+if [ -z "$SOURCE_FILE" ] && [ "${EXTRACT_LIMIT:-0}" -le 0 ]; then
+  echo "[replay] Sandbox tests require a positive EXTRACT_LIMIT."
+  exit 1
+fi
+# Use the same real project identifier for emulator resource names and BigQuery.
+# PUBSUB_EMULATOR_HOST ensures all messages stay on the local emulator.
+EMULATOR_PROJECT="$GCP_PROJECT_ID"
+
+PUBLISH_ARGS=()
+if [ -n "$SOURCE_FILE" ]; then
+  echo "[replay] offline source: $SOURCE_FILE"
+  PUBLISH_ARGS=(--from-file "$SOURCE_FILE")
 else
-  echo "[replay] EXTRACT_LIMIT=$EXTRACT_LIMIT events"
+  echo "[replay] EXTRACT_LIMIT=$EXTRACT_LIMIT events per day range"
 fi
 
 # Clean up registrations left by a previous run before starting new children.
@@ -92,10 +132,18 @@ if [ "${EMULATOR_PRESTARTED:-0}" = "1" ]; then
   EMULATOR_PID=""
 else
   echo "[replay 1/5] starting emulator..."
-  gcloud beta emulators pubsub start \
-      --project="$EMULATOR_PROJECT" --host-port="localhost:$EMULATOR_PORT" &
-  EMULATOR_PID=$!
-  register_pid "$EMULATOR_PID" "emulator" "emulators pubsub"
+  if [ "${OS:-}" = "Windows_NT" ]; then
+    gcloud beta emulators pubsub start \
+        --project="$EMULATOR_PROJECT" --host-port="localhost:$EMULATOR_PORT" &
+    EMULATOR_PID=$!
+    # Register the native wrapper before probing so failed startup also cleans up.
+    register_native_pid "$EMULATOR_PID" "emulator-wrapper" "pubsub"
+  else
+    setsid gcloud beta emulators pubsub start \
+        --project="$EMULATOR_PROJECT" --host-port="localhost:$EMULATOR_PORT" &
+    EMULATOR_PID=$!
+    register_pid "$EMULATOR_PID" "emulator" "pubsub"
+  fi
 fi
 
 "$PY" - "$EMULATOR_PORT" <<'EOF'
@@ -115,26 +163,40 @@ EOF
 
 export PUBSUB_EMULATOR_HOST="localhost:$EMULATOR_PORT"
 
+if [ "${OS:-}" = "Windows_NT" ] && [ "${EMULATOR_PRESTARTED:-0}" != "1" ]; then
+  "$PY" scripts/watch_resources.py --pid-dir "$PID_DIR" \
+      --register-listener "$EMULATOR_PORT" --token cloud-pubsub-emulator
+fi
+
+echo "[replay] preparing topic and subscription before starting consumer..."
+GCP_PROJECT_ID="$EMULATOR_PROJECT" "$PY" src/extract/publisher.py --setup-only
+
+PIPELINE_OUT_DIR="$OUT_DIR"
+if [ "${OS:-}" = "Windows_NT" ]; then
+  PIPELINE_OUT_DIR="$(cygpath -wa "$OUT_DIR")"
+fi
+
 echo "[replay 2/5] starting resource watchdog and streaming pipeline..."
 "$PY" scripts/watch_resources.py --pid-dir "$PID_DIR" --interval 15 &
 MONITOR_PID=$!
 
 "$PY" src/pipeline/dataflow_pipeline.py \
     --input_subscription="projects/$EMULATOR_PROJECT/subscriptions/ga4-events-sub" \
-    --output_dir "$OUT_DIR" \
-    --dedup_window_sec "$DEDUP_WINDOW" ${PIPELINE_EXTRA_ARGS:-} \
-    --runner=DirectRunner &
+    --output_dir "$PIPELINE_OUT_DIR" \
+    --dedup_window_sec "$DEDUP_WINDOW" --use_bundle_direct_runner \
+    ${PIPELINE_EXTRA_ARGS:-} --runner=DirectRunner &
 PIPELINE_PID=$!
-register_pid "$PIPELINE_PID" "pipeline" "dataflow_pipeline.py"
+register_native_pid "$PIPELINE_PID" "pipeline" "dataflow_pipeline.py"
 
-# Project id is passed inline: the .env (real BigQuery project) is preserved
-# for the optional load step below.
-
-echo "[replay 3/5] publishing real BigQuery events to the emulator..."
+if [ -n "$SOURCE_FILE" ]; then
+  echo "[replay 3/5] publishing offline fixture events to the emulator..."
+else
+  echo "[replay 3/5] publishing real BigQuery events to the emulator..."
+fi
 set +e
-GCP_PROJECT_ID="$EMULATOR_PROJECT" "$PY" src/extract/publisher.py &
+"$PY" src/extract/publisher.py "${PUBLISH_ARGS[@]}" &
 PUBLISH_PID=$!
-register_pid "$PUBLISH_PID" "publisher" "publisher.py"
+register_native_pid "$PUBLISH_PID" "publisher" "publisher.py"
 wait "$PUBLISH_PID"
 PUBLISH_STATUS=$?
 set -e
@@ -194,7 +256,8 @@ if [ "$LOAD" -eq 1 ]; then
   if [ -z "${GCP_PROJECT_ID:-}" ]; then
     echo "Missing real GCP_PROJECT_ID in .env for --load"; exit 1
   fi
-  "$PY" scripts/load_raw_to_bigquery.py --from-jsonl "$OUT_DIR"
+  "$PY" scripts/load_raw_to_bigquery.py --from-jsonl "$OUT_DIR" \
+      ${REPLACE_DAY:+--replace-day}
   echo "[replay] loaded. Point BQ_RAW_* at the raw dataset and rebuild."
 else
   echo "[replay 5/5] replay complete. Output: $OUT_DIR"

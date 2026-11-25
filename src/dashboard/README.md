@@ -31,6 +31,15 @@ streamlit run src/dashboard/app.py
 pytest tests/test_dashboard.py    # dashboard tests
 ```
 
+For a headless Windows run, set `STREAMLIT_BROWSER_GATHER_USAGE_STATS=false` and
+`STREAMLIT_SERVER_HEADLESS=true` to avoid the first-run email prompt. Use the
+matching CLI flags in `scripts/docker-entrypoint.sh` when running a container.
+
+BigQuery queries use a dry-run estimate before execution. `BQ_MAX_QUERY_BYTES`
+(default 134217728 bytes) is the hard per-query ceiling, also set in dbt
+profiles. Actual scans are appended to `build/bigquery_usage.jsonl`; monthly
+project-wide usage is read with `python scripts/report_bigquery_usage.py`.
+
 Streamlit prints the URL (default http://localhost:8501). Stop it with `Ctrl+C`.
 Code changes are picked up when you click **Rerun** in the app or press `R`;
 restart the command if a changed module is not reloaded.

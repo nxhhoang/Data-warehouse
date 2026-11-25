@@ -3,6 +3,7 @@
 *.key
 *service-account*.json
 config/gcp/*.json
+**/application_default_credentials.json
 
 # ==== Python ====
 __pycache__/
@@ -15,6 +16,7 @@ venv/
 
 # ==== Build artifacts (pipeline dry-run outputs) ====
 build/
+tests/benchmark_results.json
 
 # ==== Local data (do not commit) ====
 data/raw/*
@@ -25,6 +27,8 @@ data/quality_log/*
 !data/quality_log/.gitkeep
 
 # ==== dbt ====
+src/warehouse/profiles.yml
+src/warehouse/.user.yml
 src/warehouse/target/
 src/warehouse/dbt_packages/
 src/warehouse/logs/

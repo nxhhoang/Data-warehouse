@@ -11,7 +11,10 @@ from the repository root.
 | `setup_venv.sh` | setup | Create and populate the `.venv` virtual environment |
 | `run_simulation.sh` | all (local) | Full simulation chain: fixture → dry-run → verify → quality-log export |
 | `run_emulator_chain.sh` | all (local) | Same chain but through the local Pub/Sub emulator (no billing) |
-| `run_emulator_replay.sh` | all (local) | Variant B: real BigQuery events through the emulator, with resource watchdog |
+| `run_emulator_replay.sh` | all (local) | Replay real BigQuery or fixture events through the emulator, with resource watchdog |
+| `report_bigquery_usage.py` | monitoring | Report per-query and project-month BigQuery usage with a self-imposed budget |
+| `verify_sandbox.py` | 4 — Warehouse | Read raw/core metadata and query all three KPI views with a byte limit |
+| `smoke_docker_dashboard.sh` | 5 — Dashboard | Probe the dashboard HTTP endpoint and Docker resource limits, then remove the container |
 | `stop_emulator_replay.sh` | cleanup | Stop every process registered by the replay orchestrator |
 | `watch_resources.py` | monitoring | Track RAM/disk and clean up replay processes |
 | `pubsub_status.py` | monitoring | List Pub/Sub resources and safely inspect messages |
@@ -46,13 +49,11 @@ no GCP account, no billing, no secrets. Chain:
 4. `export_quality_log.py --from-jsonl` — write `data/quality_log/*.csv`
 
 ```bash
-bash scripts/run_emulator_chain.sh
-# or reuse an emulator already listening on localhost:8085:
-EMULATOR_PRESTARTED=1 bash scripts/run_emulator_chain.sh
+bash scripts/run_simulation.sh
 ```
 
-This is the exact chain the GitHub Actions workflow
-(`ci-tests.yml`) runs on every branch after the unit tests.
+This is the file-based simulation the Python CI job runs. The separate
+`docker-smoke` job exercises `run_emulator_replay.sh --from-file`.
 
 ## run_emulator_chain.sh
 
@@ -69,17 +70,28 @@ bash scripts/run_emulator_chain.sh
 
 ## run_emulator_replay.sh
 
-Variant B (runbook section 4d): replay **real BigQuery data** through the local
-Pub/Sub emulator. Manages the emulator, publisher, streaming pipeline and a
-RAM/disk watchdog; every PID is registered under `build/emulator_replay/pids`
-and stopped on all exit paths. Publishing speed is intentionally unchanged —
-this run validates correctness, not throughput.
+The canonical orchestrator replays real BigQuery data or an explicit fixture
+through the local emulator. It owns the emulator wrapper/Java process,
+publisher, pipeline and a RAM/disk watchdog. Native Windows PIDs are resolved
+from Git Bash's `WINPID`; Linux emulator processes use a dedicated process group.
+Consumers stop before the emulator so cleanup does not create RPC errors.
+
+`EXTRACT_LIMIT` must be positive for BigQuery replay, and
+`PUBLISH_RATE_PER_SEC` throttles publishing. The default date range in
+`.env.example` is one day, not 92 days. The emulator CLI uses
+`--use_bundle_direct_runner` because Prism does not implement Pub/Sub reads.
 
 ```bash
-bash scripts/run_emulator_replay.sh [--load] [--timeout 1800] [--window 600]
-# --load: upload output to the real raw dataset with load_raw_to_bigquery.py
-# PIPELINE_EXTRA_ARGS="--direct_running_mode=in_memory" for runner compatibility
+bash scripts/run_emulator_replay.sh [--load] [--timeout 240] [--window 5] \
+  [--from-file tests/fixtures/ga4_events_sample.jsonl] [--replace-day]
+# --load: upload JSONL to the real raw dataset without GCS.
+# --replace-day: explicitly allow replacing a populated daily table (destructive).
 ```
+
+`run_emulator_chain.sh` is a compatibility wrapper around this orchestrator for
+offline fixtures. It retains `build/emulator_run`, verifies the usual 4/2/4
+routing, and exports the quality CSV. Only run one replay orchestrator at a time
+in a repository, because its PID registration directory is shared.
 
 ## stop_emulator_replay.sh / watch_resources.py
 
@@ -136,9 +148,18 @@ makes this a routine operation, not a disaster recovery):
 bash scripts/rebuild_warehouse.sh
 ```
 
-Prerequisites: `.env` (or exported `GCP_PROJECT_ID`),
-`src/warehouse/profiles.yml` copied from `profiles.yml.example`, and
-`gcloud auth application-default login`. See `docs/runbook.md` section 4.
+Prerequisites: `.env` (or exported `GCP_PROJECT_ID`) and
+`gcloud auth application-default login`. If `profiles.yml` is absent, the script
+copies the example, with two threads and a per-query byte guard. dbt uses the
+extraction start/end dates unless `DBT_VARS` is explicitly set. See `docs/runbook.md`.
+
+`python scripts/report_bigquery_usage.py` aggregates completed query bytes from
+`region-us.INFORMATION_SCHEMA.JOBS_BY_PROJECT`. Its default 50 GiB self-imposed
+budget is lower than Sandbox's 1 TiB monthly free quota and returns exit code 2
+when exhausted. Job history can lag; the local JSONL log is not a billing invoice.
+
+`python scripts/verify_sandbox.py` checks table metadata and executes bounded
+`COUNT(*)` on all KPI views. It does not use metrics from the mock dashboard.
 
 ## compile_channel_macro.py
 
@@ -192,11 +213,30 @@ Uploads the local pipeline JSONL outputs into the BigQuery raw tables
 `events_YYYYMMDD` using client-side load jobs (`load_table_from_file`).
 Needs no GCS bucket and works inside the BigQuery Sandbox without billing —
 this is the bridge that turns an emulator-chain (or dry-run) output into a
-real warehouse build. Each day is loaded with `WRITE_TRUNCATE`, so re-running
-the chain and this script is idempotent per day.
+real warehouse build. A non-empty daily table is refused by default to prevent
+a small replay from erasing the rest of that day. Only `--replace-day` enables
+`WRITE_TRUNCATE` for that table. Extra source fields are ignored so ingestion
+matches the smaller raw schema consumed by staging.
 
 ```bash
 python scripts/load_raw_to_bigquery.py --from-jsonl build/emulator_run
 # then point dbt at the raw dataset (BQ_RAW_PROJECT/BQ_RAW_DATASET in .env)
 # and run scripts/rebuild_warehouse.sh
 ```
+
+## Quota reports, sandbox verification and Docker dashboard
+
+See `GUIDE.md` at the repository root for the complete local/Sandbox replay
+commands, including the one-time dataset creation command. These checks all
+require real Sandbox credentials and are deliberately not automatic in CI:
+
+```bash
+python scripts/report_bigquery_usage.py
+python scripts/verify_sandbox.py
+python tests/benchmark_kpi.py --start-date 20201101 --end-date 20201101
+```
+
+`ADC_FILE=/mnt/c/<path>/application_default_credentials.json \
+  bash scripts/smoke_docker_dashboard.sh` checks the containerized dashboard in
+WSL. The container is removed by an `EXIT` trap. Offline fixture replay requires
+neither a Google account nor credentials.

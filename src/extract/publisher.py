@@ -27,7 +27,13 @@ from google.api_core.exceptions import GoogleAPIError
 from google.cloud import bigquery, pubsub_v1
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.extract.bigquery_usage import DEFAULT_USAGE_LOG, prepare_query, record_job  # noqa: E402
+
 MAX_PUBLISH_RETRIES = 3
+DEFAULT_QUERY_LIMIT_BYTES = 128 * 1024**2
 
 
 def load_env_file(path: Path = REPO_ROOT / ".env") -> None:
@@ -48,6 +54,7 @@ def load_env_file(path: Path = REPO_ROOT / ".env") -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, value = line.partition("=")
+        value = value.split(" #", 1)[0].strip()
         os.environ.setdefault(key.strip(), value.strip())
 
 
@@ -133,7 +140,9 @@ def setup_pubsub(publisher: pubsub_v1.PublisherClient, project_id: str,
 
 
 def fetch_event_payloads(bq_client: bigquery.Client, source_dataset: str,
-                         start_date: str, end_date: str, limit: int):
+                         start_date: str, end_date: str, limit: int,
+                         maximum_bytes_billed: int = DEFAULT_QUERY_LIMIT_BYTES,
+                         usage_log=DEFAULT_USAGE_LOG):
     """Query BigQuery and yield each event as a JSON string (TO_JSON_STRING).
 
     Rows are ordered by event_timestamp so the replay follows the original
@@ -150,7 +159,11 @@ def fetch_event_payloads(bq_client: bigquery.Client, source_dataset: str,
     end_date : str
         Last day to replay, formatted as YYYYMMDD.
     limit : int
-        Maximum number of events; 0 means no limit (for testing).
+        Maximum number of events; replay requires a positive limit.
+    maximum_bytes_billed : int, optional
+        Per-query dry-run and execution ceiling. Default is 128 MiB.
+    usage_log : pathlib.Path, optional
+        Append-only JSONL file containing dry-run and actual job metrics.
 
     Yields
     ------
@@ -169,24 +182,16 @@ def fetch_event_payloads(bq_client: bigquery.Client, source_dataset: str,
         bigquery.ScalarQueryParameter("start_date", "STRING", start_date),
         bigquery.ScalarQueryParameter("end_date", "STRING", end_date),
     ]
-    try:
-        dry_config = bigquery.QueryJobConfig(
-            dry_run=True, use_query_cache=False, query_parameters=params)
-        dry_job = bq_client.query(query, job_config=dry_config)
-        estimate_gb = (dry_job.total_bytes_processed or 0) / 1e9
-        print(f"[extract] dry-run estimated scan: {estimate_gb:.2f} GB")
-    except GoogleAPIError as err:
-        print(f"[extract] dry-run unavailable: {err}")
-
-    job_config = bigquery.QueryJobConfig(query_parameters=params)
-    job = bq_client.query(query, job_config=job_config)
-    print(f"[extract] BigQuery job id: {job.job_id}")
+    job = prepare_query(bq_client, query, params, maximum_bytes_billed,
+                        "source_extract", usage_log)
+    print(f"[extract] BigQuery job id: {job.job_id}", flush=True)
     try:
         for row in job.result():
             yield row["payload"]
     finally:
-        scanned_gb = (job.total_bytes_processed or 0) / 1e9
-        print(f"[extract] query completed, scanned {scanned_gb:.2f} GB")
+        scanned_mib = (job.total_bytes_processed or 0) / 1024**2
+        print(f"[extract] query completed, scanned {scanned_mib:.2f} MiB", flush=True)
+        record_job(job, "source_extract", usage_log)
 
 
 def file_payloads(path: str):
@@ -219,7 +224,7 @@ def rate_per_second(total: int, started_at: float) -> float:
 
 
 def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
-                dlq_path: str, payloads) -> dict:
+                dlq_path: str, payloads, rate_limit_per_second: float = 0.0) -> dict:
     """Publish every payload, routing persistent failures to the dead-letter topic.
 
     Each message is retried up to MAX_PUBLISH_RETRIES times with exponential
@@ -235,16 +240,23 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
         Full path of the dead-letter topic.
     payloads : Iterable[str]
         JSON strings produced by fetch_event_payloads.
+    rate_limit_per_second : float, optional
+        Maximum scheduled publishing rate; 0 disables throttling.
 
     Returns
     -------
     dict
         Counters with keys 'published', 'failed_to_dlq' and 'total'.
     """
+    if rate_limit_per_second < 0:
+        raise ValueError("Publish rate limit cannot be negative")
     stats = {"published": 0, "failed_to_dlq": 0, "total": 0}
     started_at = time.monotonic()
     last_beat = started_at
     for payload in payloads:
+        if rate_limit_per_second > 0 and stats["total"] > 0:
+            scheduled_time = started_at + stats["total"] / rate_limit_per_second
+            time.sleep(max(0.0, scheduled_time - time.monotonic()))
         now = time.monotonic()
         if now - last_beat >= 10:
             elapsed = now - started_at
@@ -260,7 +272,7 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
                 stats["published"] += 1
                 published = True
                 break
-            except GoogleAPIError as err:
+            except (GoogleAPIError, TimeoutError) as err:
                 print(f"[publish] attempt {attempt} failed: {err}")
                 time.sleep(min(2 ** attempt, 30))
         if not published:
@@ -268,7 +280,7 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
                 future = publisher.publish(dlq_path, data)
                 future.result(timeout=60)
                 stats["failed_to_dlq"] += 1
-            except GoogleAPIError as err:
+            except (GoogleAPIError, TimeoutError) as err:
                 print(f"[dlq] could not publish to the dead-letter topic: {err}")
         if stats["total"] % 10000 == 0:
             print(f"[publish] sent {stats['total']} events...")
@@ -282,7 +294,16 @@ def main() -> int:
     parser.add_argument("--from-file", default=None, metavar="PATH",
                         help="publish each line of this JSONL file instead of "
                              "querying BigQuery (e.g. tests/fixtures/"
-                             "ga4_events_sample.jsonl)")
+                              "ga4_events_sample.jsonl)")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="maximum events extracted from BigQuery")
+    parser.add_argument("--start-date", default=None, help="YYYYMMDD or YYYY-MM-DD")
+    parser.add_argument("--end-date", default=None, help="YYYYMMDD or YYYY-MM-DD")
+    parser.add_argument("--publish-rate-per-second", type=float, default=None)
+    parser.add_argument("--max-query-mib", type=float, default=None,
+                        help="fail dry runs above this estimate (default: 128 MiB)")
+    parser.add_argument("--setup-only", action="store_true",
+                        help="create the Pub/Sub resources, then exit without extracting")
     args = parser.parse_args()
 
     load_env_file()
@@ -295,10 +316,14 @@ def main() -> int:
     subscription_id = get_setting("PUBSUB_SUBSCRIPTION", f"{topic_id}-sub")
 
     publisher = pubsub_v1.PublisherClient()
-    setup_pubsub(publisher, project_id, topic_id, dlq_topic_id, subscription_id)
+    sub_path = setup_pubsub(
+        publisher, project_id, topic_id, dlq_topic_id, subscription_id)
 
     topic_path = publisher.topic_path(project_id, topic_id)
     dlq_path = publisher.topic_path(project_id, dlq_topic_id)
+    if args.setup_only:
+        print(f"[pubsub] ready: {sub_path}")
+        return 0
 
     if args.from_file:
         print(f"[extract] replaying events from file {args.from_file}")
@@ -308,15 +333,33 @@ def main() -> int:
             "BQ_SOURCE_DATASET",
             "bigquery-public-data.ga4_obfuscated_sample_ecommerce",
         )
-        start_date = to_yyyymmdd(get_setting("EXTRACT_START_DATE", "20201101"))
-        end_date = to_yyyymmdd(get_setting("EXTRACT_END_DATE", "20210131"))
-        limit = int(get_setting("EXTRACT_LIMIT", "0"))
+        start_date = to_yyyymmdd(args.start_date or get_setting(
+            "EXTRACT_START_DATE", "20201101"))
+        end_date = to_yyyymmdd(args.end_date or get_setting(
+            "EXTRACT_END_DATE", "20201101"))
+        limit = args.limit if args.limit is not None else int(get_setting(
+            "EXTRACT_LIMIT", "100"))
+        if limit <= 0:
+            print("Sandbox tests require a positive EXTRACT_LIMIT or --limit")
+            return 1
+        max_query_bytes = int(args.max_query_mib * 1024**2) \
+            if args.max_query_mib is not None else int(get_setting(
+                "BQ_MAX_QUERY_BYTES", str(DEFAULT_QUERY_LIMIT_BYTES)))
+        usage_log = get_setting("BQ_USAGE_LOG", str(DEFAULT_USAGE_LOG))
         print(f"[extract] replaying events from {source_dataset} "
-              f"({start_date} -> {end_date}, limit={limit or 'none'})")
-        bq_client = bigquery.Client(project=project_id)
-        payloads = fetch_event_payloads(bq_client, source_dataset, start_date, end_date, limit)
+              f"({start_date} -> {end_date}, limit={limit})")
+        query_project_id = get_setting("BQ_QUERY_PROJECT", project_id)
+        print(f"[extract] query project: {query_project_id}")
+        bq_client = bigquery.Client(project=query_project_id)
+        payloads = fetch_event_payloads(
+            bq_client, source_dataset, start_date, end_date, limit,
+            maximum_bytes_billed=max_query_bytes, usage_log=usage_log)
 
-    stats = publish_all(publisher, topic_path, dlq_path, payloads)
+    publish_rate = args.publish_rate_per_second
+    if publish_rate is None:
+        publish_rate = float(get_setting("PUBLISH_RATE_PER_SEC", "0"))
+    stats = publish_all(publisher, topic_path, dlq_path, payloads,
+                        rate_limit_per_second=publish_rate)
     print(f"[extract] finished: {stats}")
     return 0
 

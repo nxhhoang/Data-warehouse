@@ -414,6 +414,9 @@ def build_pipeline(argv):
         If neither --bq_project nor --project is provided.
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument("--use_bundle_direct_runner", action="store_true",
+                        help="use BundleBasedDirectRunner; skips the Prism trial that "
+                             "does not implement Pub/Sub reads")
     parser.add_argument("--input_subscription", default=None,
                         help="projects/<project>/subscriptions/<sub> (streaming mode)")
     parser.add_argument("--input_file", default=None,
@@ -481,7 +484,12 @@ def build_pipeline(argv):
     pipeline_options = PipelineOptions(pipeline_args)
     pipeline_options.view_as(StandardOptions).streaming = known_args.input_file is None
 
-    with beam.Pipeline(options=pipeline_options) as pipeline:
+    runner = None
+    if known_args.use_bundle_direct_runner:
+        from apache_beam.runners.direct.direct_runner import BundleBasedDirectRunner
+        runner = BundleBasedDirectRunner()
+
+    with beam.Pipeline(runner=runner, options=pipeline_options) as pipeline:
         if known_args.input_file:
             messages = pipeline | "ReadFile" >> beam.io.ReadFromText(known_args.input_file)
         else:

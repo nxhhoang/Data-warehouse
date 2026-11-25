@@ -12,6 +12,8 @@ marketing_dw:
       method: oauth
       project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: marketing_dss
-      threads: 4
+      threads: 2
       timezone: UTC
       location: US
+      # Hard per-query ceiling, not a billing configuration.
+      maximum_bytes_billed: "{{ env_var('BQ_MAX_QUERY_BYTES', '134217728') | int }}"

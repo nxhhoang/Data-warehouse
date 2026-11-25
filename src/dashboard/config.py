@@ -73,11 +73,17 @@ class Settings:
         GCP project that owns the core / marts / kpi datasets.
     alert_threshold : float
         Default drop threshold for alerts (feature 8); users adjust it in the app.
+    max_query_bytes : int
+        Per-query scan limit; dry-run estimates above this stop execution.
+    usage_log : pathlib.Path
+        Append-only file receiving actual BigQuery job metrics.
     """
 
     data_source: str
     project_id: str
     alert_threshold: float
+    max_query_bytes: int = 128 * 1024**2
+    usage_log: Path = REPO_ROOT / "build" / "bigquery_usage.jsonl"
 
 
 def get_settings() -> Settings:
@@ -92,4 +98,7 @@ def get_settings() -> Settings:
         data_source=source,
         project_id=os.environ.get("GCP_PROJECT_ID", ""),
         alert_threshold=float(os.environ.get("ALERT_DEFAULT_THRESHOLD", "0.2")),
+        max_query_bytes=int(os.environ.get(
+            "BQ_MAX_QUERY_BYTES", str(128 * 1024**2))),
+        usage_log=Path(os.environ.get("BQ_USAGE_LOG", "build/bigquery_usage.jsonl")),
     )

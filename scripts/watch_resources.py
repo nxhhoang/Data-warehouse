@@ -52,9 +52,21 @@ def read_registrations(pid_dir: Path) -> list[dict]:
 def _windows_snapshot(pid: int) -> tuple[float | None, str]:
     """Return (RAM MB, command line) via PowerShell CIM, or (None, "")."""
     command = (
+        "$queue = New-Object 'System.Collections.Generic.Queue[int]'; "
+        f"$queue.Enqueue([int]{pid}); $seen = @{{}}; "
+        "$ram = [long]0; $rootCommand = ''; "
+        "while ($queue.Count -gt 0) { "
+        "$current = $queue.Dequeue(); "
         "$p = Get-CimInstance Win32_Process -Filter "
-        f"\"ProcessId = {pid}\" -ErrorAction SilentlyContinue; "
-        "if ($p) { $p | Select-Object ProcessId,WorkingSetSize,CommandLine "
+        '"ProcessId = $($current)" -ErrorAction SilentlyContinue; '
+        "if ($p -and -not $seen.ContainsKey($current)) { "
+        "$seen[$current] = $true; $ram += [long]$p.WorkingSetSize; "
+        f"if ($current -eq {pid}) {{ $rootCommand = $p.CommandLine }}; "
+        "$children = Get-CimInstance Win32_Process -Filter "
+        '"ParentProcessId = $($current)" -ErrorAction SilentlyContinue; '
+        "foreach ($child in $children) { $queue.Enqueue([int]$child.ProcessId) } "
+        "} }; if ($rootCommand) { "
+        "[PSCustomObject]@{WorkingSetSize = $ram; CommandLine = $rootCommand} "
         "| ConvertTo-Json -Compress }"
     )
     try:
@@ -70,7 +82,29 @@ def _windows_snapshot(pid: int) -> tuple[float | None, str]:
         return None, ""
 
 
-def process_snapshot(pid: int) -> tuple[float | None, str]:
+def _linux_emulator_group_ram_kb(pid: int) -> int:
+    """Read RSS of processes in a dedicated emulator process group."""
+    try:
+        if os.getpgid(pid) != pid:
+            return 0
+    except OSError:
+        return 0
+    total = 0
+    for stat_path in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            stat = stat_path.read_text(encoding="utf-8")
+            if int(stat[stat.rfind(")") + 2:].split()[2]) != pid:
+                continue
+            status = stat_path.with_name("status").read_text(encoding="utf-8")
+            rss_line = next(line for line in status.splitlines()
+                            if line.startswith("VmRSS:"))
+            total += int(rss_line.split()[1])
+        except (OSError, ValueError, IndexError, StopIteration):
+            continue
+    return total
+
+
+def process_snapshot(pid: int, include_group: bool = False) -> tuple[float | None, str]:
     """Return (resident RAM MB, command line), or (None, "") when gone."""
     if os.name == "nt":
         return _windows_snapshot(pid)
@@ -80,9 +114,68 @@ def process_snapshot(pid: int) -> tuple[float | None, str]:
                       if line.startswith("VmRSS:"))
         cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\x00", b" ").decode(
             "utf-8", errors="replace")
+        if include_group:
+            group_ram_kb = _linux_emulator_group_ram_kb(pid)
+            if group_ram_kb:
+                ram_kb = group_ram_kb
         return ram_kb / 1024, cmdline
     except (OSError, ValueError, StopIteration):
         return None, ""
+
+
+def register_windows_listener(pid_dir: Path, port: int, label: str, token: str) -> dict:
+    """Register the real Windows listener rather than a gcloud shell wrapper.
+
+    Git Bash may start cmd -> java and then exit without owning that tree.
+    Matching the token before saving the listener PID protects unrelated users
+    of the port from cleanup.
+
+    Parameters
+    ----------
+    pid_dir : pathlib.Path
+        Directory holding process registration JSON files.
+    port : int
+        Local emulator TCP port.
+    label : str
+        Logical name used for monitoring and cleanup.
+    token : str
+        Required substring of the listener's command line.
+
+    Returns
+    -------
+    dict
+        Registration containing the native process ID, label and token.
+
+    Raises
+    ------
+    RuntimeError
+        If no listener exists or its command line does not match the token.
+    """
+    if os.name != "nt":
+        raise ValueError("Listener registration is only needed on Windows")
+    command = (
+        "$connection = Get-NetTCPConnection -LocalPort "
+        f"{int(port)} -State Listen -ErrorAction SilentlyContinue | "
+        "Select-Object -First 1; if ($connection) { $connection.OwningProcess }"
+    )
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", command],
+        capture_output=True, text=True, timeout=20, check=False,
+    )
+    try:
+        pid = int(result.stdout.strip())
+    except ValueError as err:
+        raise RuntimeError(f"No listener found on port {port}") from err
+    ram_mb, cmdline = process_snapshot(pid)
+    if ram_mb is None:
+        raise RuntimeError(f"Listener process {pid} no longer exists")
+    if token.lower() not in cmdline.lower():
+        raise RuntimeError(
+            f"Refusing to register port {port}: command line does not contain {token!r}")
+    record = {"pid": pid, "label": label, "token": token}
+    pid_dir.mkdir(parents=True, exist_ok=True)
+    (pid_dir / f"{label}.json").write_text(json.dumps(record), encoding="utf-8")
+    return record
 
 
 def free_disk_mb() -> int:
@@ -93,8 +186,14 @@ def free_disk_mb() -> int:
 def collect_samples(registrations: list[dict]) -> list[dict]:
     """Attach a live RAM reading and command line to each registration."""
     samples = []
+    labels = {record.get("label") for record in registrations}
     for record in registrations:
-        ram_mb, cmdline = process_snapshot(record["pid"])
+        # The wrapper contains the Java listener. Count it only if listener
+        # registration failed, so their two process trees are not double-counted.
+        if record.get("label") == "emulator-wrapper" and "emulator" in labels:
+            continue
+        ram_mb, cmdline = process_snapshot(
+            record["pid"], include_group=record.get("label") == "emulator")
         if ram_mb is not None:
             samples.append({**record, "ram_mb": ram_mb, "cmdline": cmdline})
     return samples
@@ -118,15 +217,35 @@ def violations(samples: list[dict], disk_mb: int,
     return issues
 
 
+def _terminate_posix(record: dict, pid: int, sig: int) -> None:
+    """Stop the emulator's dedicated process group, protecting unrelated jobs."""
+    if record.get("label") == "emulator":
+        try:
+            if os.getpgid(pid) == pid:
+                os.killpg(pid, sig)
+                return
+        except OSError:
+            pass
+    os.kill(pid, sig)
+
+
 def stop_registered(pid_dir: Path, grace_seconds: float = 3.0) -> None:
     """Stop every registered live process, then remove its PID file.
 
     Command lines are validated against the registered token first. On Windows
     taskkill /T also stops descendants such as the Beam local worker.
     """
-    for path in sorted(pid_dir.glob("*.json")):
+    priority = {
+        "pipeline": 0, "publisher": 1, "monitor": 2,
+        "emulator": 3, "emulator-wrapper": 4,
+    }
+    paths = sorted(
+        pid_dir.glob("*.json"),
+        key=lambda path: (priority.get(path.stem, 2), path.stem),
+    )
+    for path in paths:
         try:
-            record = json.loads(path.read_text(encoding="utf-8"))
+            record = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             continue
         pid = record.get("pid")
@@ -144,7 +263,7 @@ def stop_registered(pid_dir: Path, grace_seconds: float = 3.0) -> None:
                 subprocess.run(["taskkill", "/PID", str(pid), "/T"],
                                capture_output=True, timeout=15, check=False)
             else:
-                os.kill(pid, signal.SIGTERM)
+                _terminate_posix(record, pid, signal.SIGTERM)
         except (OSError, subprocess.SubprocessError):
             pass
         time.sleep(grace_seconds)
@@ -155,7 +274,7 @@ def stop_registered(pid_dir: Path, grace_seconds: float = 3.0) -> None:
                     subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
                                    capture_output=True, timeout=15, check=False)
                 else:
-                    os.kill(pid, signal.SIGKILL)
+                    _terminate_posix(record, pid, signal.SIGKILL)
             except (OSError, subprocess.SubprocessError):
                 pass
         path.unlink(missing_ok=True)
@@ -190,7 +309,19 @@ def main() -> int:
     parser.add_argument("--once", action="store_true", help="one sample, then exit")
     parser.add_argument("--stop-dir", type=Path, default=None,
                         help="stop registered processes and exit")
+    parser.add_argument("--register-listener", type=int, default=None, metavar="PORT",
+                        help="register a Windows listener PID for reliable cleanup")
+    parser.add_argument("--label", default="emulator")
+    parser.add_argument("--token", default="cloud-pubsub-emulator")
     args = parser.parse_args()
+    if args.register_listener is not None:
+        try:
+            record = register_windows_listener(
+                args.pid_dir, args.register_listener, args.label, args.token)
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as err:
+            parser.error(str(err))
+        print(f"[watch] registered {record['label']} listener pid={record['pid']}")
+        return 0
     if args.stop_dir:
         stop_registered(args.stop_dir)
         return 0
