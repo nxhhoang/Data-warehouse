@@ -1,0 +1,128 @@
+\section{Application development}
+\label{sec:application-development}
+
+Phần triển khai chọn cách chạy cục bộ cho việc phát lại và xử lý event, sau đó dựng kho trên BigQuery Sandbox. Đây là cách kiểm chứng và mô phỏng tiếp nhận dữ liệu, không phải một luồng ghi nhận trực tuyến sản xuất của cửa hàng.
+
+\subsection{Các thành phần chương trình}
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{6.3cm} >{\raggedright\arraybackslash}X}
+\caption{Các thành phần implementation và nhiệm vụ}
+\label{tab:components} \\
+\hline
+\textbf{Tệp/thư mục} & \textbf{Nhiệm vụ} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Tệp/thư mục} & \textbf{Nhiệm vụ} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+
+\texttt{src/extract/publisher.py}
+& Đọc GA4 theo khoảng ngày có giới hạn, tạo topic/subscription, gửi message vào emulator theo thứ tự timestamp, retry khi lỗi publish và điều phối message lỗi sang dead-letter topic. Có chế độ \texttt{--from-file} cho thử nghiệm offline. \\
+
+\texttt{src/pipeline/dataflow\_pipeline.py}
+& Parse JSON, kiểm tra trường bắt buộc, chuẩn hóa kiểu số, thay các giá trị giữ chỗ bằng giá trị thiếu, phân nhánh invalid event, khử trùng và tạo quality log. BundleBasedDirectRunner được chọn ở luồng emulator để tránh thử runner không hỗ trợ Pub/Sub. \\
+
+\texttt{scripts/run\_emulator\_replay.sh}
+& Điều phối emulator, publisher, pipeline và watchdog. Theo dõi PID, dung lượng đĩa và RAM theo cây process; có cơ chế timeout, dừng consumer trước khi dừng emulator và cho phép giới hạn worker. \\
+
+\texttt{scripts/load\_raw\_to\_bigquery.py}
+& Nhóm JSONL theo \texttt{event\_date} rồi load vào raw table \texttt{events\_YYYYMMDD}. Script tạo dataset ở US khi chưa có, giữ schema cần dùng cho staging và không đòi hỏi stream ghi vào BigQuery. \\
+
+\texttt{src/warehouse/}
+& Chứa nguồn DDL và DAG của dbt. Ba staging view tiền xử lý, bốn fact, tám dimension, bốn marts và các test đối chiếu được triển khai theo thứ tự phụ thuộc. Các trường trả về của fact/mart mang chú thích kiểu BigQuery để dễ kiểm tra schema khi vẽ lại bảng. \\
+
+\texttt{src/kpi/deploy\_views.py}
+& Tạo dataset \texttt{kpi} khi cần và deploy \texttt{v\_kpi\_traffic\_engagement}, \texttt{v\_kpi\_funnel}, \texttt{v\_kpi\_conversion\_revenue}. \\
+
+\texttt{src/dashboard/}
+& Dashboard Streamlit khai thác core và marts qua lớp \texttt{data.py}. Nguồn \texttt{mock} phục vụ presentation offline; \texttt{bigquery} dùng dữ liệu của Sandbox thật. Dashboard không gửi SQL tùy ý từ từng trang riêng. \\
+\end{xltabular}
+
+\subsection{Dòng dữ liệu khi chạy}
+
+Quá trình chạy thực hiện như sau:
+\begin{enumerate}
+  \item Publisher được sử dụng để truy vấn một khoảng ngày trong nguồn GA4 công khai, lấy \texttt{TO\_JSON\_STRING(t)} cho mỗi event và publish theo thứ tự thời gian.
+  \item Pub/Sub Emulator làm broker cục bộ giữa publisher và Beam. Pipeline chờ subscription, xử lý các nhánh valid, dead-letter và quality log, rồi ghi chúng thành JSONL.
+  \item Sau khi output ổn định, orchestration dừng publisher/pipeline trước khi đóng emulator. File valid được nạp vào raw trên Sandbox bằng \texttt{load\_table\_from\_file} \parencite{bigquery-sandbox}.
+  \item dbt thực hiện staging, dựng fact và dimension, xây bốn marts, rồi kiểm tra khóa ngoại, đối chiếu doanh thu và đối chiếu KPI với raw. Cách tổ chức view cho staging và table cho core/marts theo cấu hình dbt của project \parencite{dbt-materializations}.
+  \item Ba KPI view giúp dashboard tiêu thụ cùng một định nghĩa số liệu. Streamlit có thể chạy cùng dữ liệu với Docker hoặc kết nối BigQuery từ máy phát triển.
+\end{enumerate}
+
+Việc ghi JSONL trung gian có mục đích rõ ràng: Sandbox không được dùng như một streaming insert endpoint cho luồng này. Batch load từ file vẫn cho phép kiểm tra toàn bộ đường đi của sự kiện mà không thêm một dịch vụ trung chuyển.
+
+\subsection{Cài đặt và chạy thủ công}
+
+Người dùng làm lần đầu cần Python 3.11 trở lên, Git Bash trên Windows, JDK phù hợp emulator, gcloud CLI cùng component \texttt{pubsub-emulator} và \texttt{beta}. BigQuery Sandbox cần project ID thật và đăng nhập Google, nhưng luồng fixture không cần tài khoản Google. \medskip
+
+Hai việc đăng nhập có phạm vi khác nhau: \texttt{gcloud auth login} thiết lập CLI, còn \texttt{gcloud auth application-default login} thiết lập ADC cho Python/dbt/dashboard. Sau khi chọn project, cài môi trường và dataset: \medskip
+
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+bash scripts/setup_venv.sh
+cp .env.example .env
+# Fill GCP_PROJECT_ID and project-owned raw project in .env.
+bq mk --dataset --location=US "$PROJECT_ID:marketing_dss_raw"
+\end{lstlisting}\medskip
+
+Thông báo \texttt{Already Exists} không yêu cầu tạo lại dataset. Loader cũng tự tạo dataset khi nó chưa tồn tại trên \texttt{Google Cloud Bigquery}. Cấu hình bắt đầu nên giữ \texttt{EXTRACT\_START\_DATE} và \texttt{EXTRACT\_END\_DATE} cùng một ngày, \texttt{EXTRACT\_LIMIT=100} và \texttt{PUBLISH\_RATE\_PER\_SEC=10}. \texttt{EXTRACT\_LIMIT} chỉ giới hạn số dòng event, không trực tiếp giới hạn lượng bytes của truy vấn. \medskip
+
+Sau khi cấu hình, replay và dựng kho: \medskip
+
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+bash scripts/run_emulator_replay.sh --load --timeout 240 --window 5
+bash scripts/rebuild_warehouse.sh
+python scripts/verify_sandbox.py
+python scripts/report_bigquery_usage.py
+\end{lstlisting} \medskip
+
+Pipeline đọc streaming từ emulator nên trạng thái chờ subscription không có nghĩa query bị treo. Đầu ra có timeout và điều kiện ổn định, watchdog theo dõi tài nguyên và các process được dọn khi kết thúc. Cơ chế dọn dữ liệu khác với cơ chế ngừng process: bảng ngày đã có dữ liệu sẽ bị loader từ chối ghi đè trừ khi người dùng truyền \texttt{--replace-day}. Trường hợp không muốn thay cả bảng ngày, hãy dùng dataset test riêng. \medskip
+
+Dashboard chạy trực tiếp bằng: \medskip
+
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+streamlit run src/dashboard/app.py --server.port=8501
+\end{lstlisting} \medskip
+
+Trên Windows, cài \texttt{STREAMLIT\_BROWSER\_GATHER\_USAGE\_STATS=false} và cài thêm \texttt{STREAMLIT\_SERVER\_HEADLESS=true} để bỏ prompt onboarding và tự động mở browser. Lệnh gọi từ thư mục \texttt{.venv} đã được kích hoạt. Người dùng mới có thể đọc \texttt{README.md} ở repository root cho chuỗi lệnh đầy đủ. \medskip
+
+\subsection{Chạy bằng Docker} 
+
+Dockerfile gói JDK, gcloud SDK, component Pub/Sub Emulator và môi trường Python. Compose tách hai vai trò: service replay chạy publisher/emulator/DirectRunner rồi thoát; service dashboard chạy Streamlit sau khi replay thành công. Kết quả JSONL được giữ qua volume \texttt{build/docker}.
+
+Chế độ offline dùng fixture chính trong repository:
+
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+GCP_PROJECT_ID=local-project DASHBOARD_DATA_SOURCE=mock \
+  PUBLISH_RATE_PER_SEC=0 docker compose up --build
+\end{lstlisting}
+
+Luồng trên BigQuery Sandbox có hai điểm bổ sung bắt buộc. Một là project ID thật và dataset test an toàn. Hai là ADC được mount read-only từ file \texttt{application\_default\_credentials.json}; không copy credentials vào image:
+
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+ADC_FILE=/mnt/c/path/to/application_default_credentials.json \
+RAW_DATASET=marketing_dss_docker_tutorial \
+  docker compose --env-file .env -f docker-compose.yml \
+  -f docker-compose.sandbox.yml up --build
+\end{lstlisting}
+
+Dataset test mới giúp tránh ghi đè batch trước. Nếu dùng lại dataset đã có dữ liệu, loader sẽ báo lỗi ở guard thay vì tự xóa bảng; phải đổi dataset hoặc chủ động thêm \texttt{REPLACE\_RAW\_DAY=1} khi chấp nhận thay cả bảng ngày. Dừng toàn bộ service bằng \texttt{docker compose down --remove-orphans}. Giới hạn runtime là 2 GiB và 1.5 CPU cho replay, 1 GiB và 1 CPU cho dashboard; giới hạn này được kiểm tra bằng \texttt{docker inspect} và \texttt{docker stats}.
+
+\subsection{Dữ liệu hiển thị và Looker Studio}
+
+Bản dashboard hiện thực là Streamlit. Người dùng có thể lọc thời gian, kênh, nguồn/medium, thiết bị, quốc gia và các chiều phân tích khác phù hợp từng trang. Các trang bao gồm tổng quan, so sánh hiệu suất, chất lượng kênh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Tab CMO/Manager/Specialist chỉ thay đổi nhóm trang hiển thị; nó không phải lớp phân quyền.
+
+Với nhu cầu trình bày bằng Looker Studio trong giới hạn không bật billing, có thể xuất các kết quả tổng hợp thành CSV từ BigQuery Console rồi tải file lên Looker Studio dưới dạng dữ liệu tệp tín. Các view gồm:
+
+\begin{itemize}
+  \item \texttt{v\_kpi\_traffic\_engagement}
+  \item \texttt{v\_kpi\_funnel}
+  \item \texttt{v\_kpi\_conversion\_revenue}
+\end{itemize}
+
+\texttt{event\_date} dùng làm trường ngày, còn kênh và thiết bị làm chiều phân tích. Khi gộp nhiều dòng, tỷ lệ phải được tính lại từ số đếm/doanh thu, không lấy trung bình các tỷ lệ đã tính sẵn. CSV tĩnh là cách chia sẻ snapshot, không phải kết nối live BigQuery phải cập nhật tự động. Cách nối trực tiếp liên quan Billing Project được để phần mở rộng ở kết luận.
+

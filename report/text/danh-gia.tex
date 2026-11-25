@@ -1,0 +1,60 @@
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Phương pháp kiểm tra}
+
+Đánh giá được thực hiện trên ba lớp: kiểm thử code local, replay dữ liệu công khai trên một ngày Sandbox, và lặp lại replay trong Docker/WSL. Kiểm thử dùng các đầu ra cụ thể thay vì chỉ kiểm tra service có khởi động được hay không.
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
+\caption{Kết quả kiểm chứng của implementation}
+\label{tab:evaluation-results} \\
+\hline
+\textbf{Kiểm chứng} & \textbf{Kết quả quan sát được} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Kiểm chứng} & \textbf{Kết quả quan sát được} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+
+Unit test và simulation
+& 153 test Pytest pass. Fixture 9 dòng được định tuyến thành 4 valid, 2 dead-letter và 4 quality rows; cũng xuất được CSV quality log. \\
+
+Replay dữ liệu công khai
+& 100/100 event được publish từ ngày 01/11/2020 qua emulator và DirectRunner, ghi thành 100 dòng JSONL hợp lệ. \\
+
+Kho trên Sandbox
+& \texttt{events\_20201101} chứa 100 event. dbt tạo 19/19 model và pass 5/5 test. \texttt{fct\_events}=100, \texttt{fct\_sessions}=17; ba KPI view có thể query và mỗi view trả 11 dòng. \\
+
+Dashboard thực tế
+& Streamlit đọc được phiên/SKU từ BigQuery thật và render 0 exception. Health endpoint và trang chính trả HTTP 200. \\
+
+Docker offline
+& 4 valid event, 2 dead-letter, 4 quality rows từ fixture. Emulator và pipeline được dừng, container được xóa. \\
+
+Docker Sandbox
+& 100 event được load vào dataset riêng \texttt{marketing\_dss\_docker\_smoke}. Kết quả được 19/19 model, 5/5 dbt test và ba KPI view, với \texttt{fct\_events}=100 và \texttt{fct\_sessions}=17. \\
+
+Benchmark giới hạn
+& Query raw đọc 7.68 MiB trong 1.636 giây; bốn query KPI lần lượt tốn 0.787, 0.787, 0.827 và 0.857 giây. Trình chạy tắt query cache ở query thật để đo latency. \\
+\end{xltabular}
+
+\subsection{Quota và tài nguyên}
+
+Một replay source của 100 event đầy đủ trong ngày thử ước tính và tiêu thụ 22.47 MiB BigQuery. Con số này khác với kích thước message vì query cần đọc các trường hợp lệ để dựng JSON của record. \texttt{BQ\_MAX\_QUERY\_BYTES=134217728} giới hạn mỗi truy vấn về mức 128 MiB: publisher/dashboard thực hiện dry-run trước và được bảo vệ ở cả lúc thực thi; dbt nhận cùng trần trong profile. Báo cáo theo tháng được đọc từ \texttt{INFORMATION\_SCHEMA.JOBS\_BY\_PROJECT}, không chỉ ước tính từ file log nội bộ.
+
+Tại snapshot cuối của bộ kiểm thử, toàn bộ project đã xử lý \textbf{103,485,196 bytes}, khoảng 103.49 MB, tương đương 0.19\% ngân sách tự đặt 50 GiB. Lịch sử job có thể trễ và đây không phải hóa đơn. Ngân sách tự đặt giúp dừng và xem xét trước khi tăng phạm vi dữ liệu, không phải tuyên bố rằng mọi query trong tương lai đều nhỏ.
+
+Trong các lần replay Docker, emulator khoảng 211 MiB, pipeline khoảng 212 MiB và dashboard Docker khoảng 86.49 MiB. Watchdog kiểm tra RAM, dung lượng ổ đĩa và PID; native process con trên Windows được dừng theo cây, còn Linux dùng process group cho emulator. Sau replay/dashboard kiểm thử, không còn listener tại 8085 hoặc 8501, cũng không còn container Compose tương ứng.
+
+\subsection{Những giới hạn của đánh giá}
+
+Thứ nhất, nguồn GA4 của report trải dài 92 ngày, nhưng phần thử replay chỉ sử dụng 100 event đầu tiên của một ngày. Nó không chứng minh hiệu năng hay quota của full replay 92 ngày. Các số latency trên là đo lần lượt trên mẫu nhỏ nên không được xem là cam kết cho dataset lớn.
+
+Thứ hai, mini-batch không chứa purchase hoặc item. Do đó, kết quả kiểm chứng thiên về luồng thu thập, chuẩn hóa schema và session. Các rule purchase và item vẫn được kiểm tra bởi fixture cục bộ, nhưng chưa có minh chứng doanh thu khác 0 trên dữ liệu thật trong lô Sandbox này. Để trình bày KPI doanh thu có ý nghĩa, cần mở rộng batch kèm đánh giá dry-run và quota riêng.
+
+Cuối cùng, DirectRunner và Pub/Sub Emulator phục vụ kiểm thử cục bộ. Chúng không mô phỏng khả năng lưu trữ bền, IAM hay hiệu suất của dịch vụ phân tán. Sản phẩm Looker CSV là snapshot phục vụ trình bày, chưa phải báo cáo BigQuery live hoàn chỉnh. Các hướng mở rộng về hạ tầng và connector được ghi nhận riêng ở phần kết luận thay vì xem như đã được triển khai.
