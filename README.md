@@ -16,7 +16,13 @@ GA4 public data (BigQuery)
   -> Staging views
   -> Core star schema: 4 fact + 8 dimension
   -> 4 marts + 3 KPI views
-  -> Streamlit or Looker Studio CSV
+
+BigQuery Core/Marts
+  -> Streamlit
+
+BigQuery KPI views
+  -> CSV export
+  -> Looker Studio
 ```
 
 - **Python Publisher** extracts events by a bounded date range and publishes them chronologically.
@@ -57,10 +63,10 @@ Use [BigQuery Sandbox](https://cloud.google.com/bigquery/docs/sandbox) for the c
 
 ## Installation
 
-### 1. Clone the integrated branch
+### 1. Clone the repository on main
 
 ```bash
-git clone --branch hoang/warehouse --single-branch https://github.com/nxhhoang/Data-warehouse.git
+git clone --branch main --single-branch https://github.com/nxhhoang/Data-warehouse.git
 cd Data-warehouse
 ```
 
@@ -112,6 +118,7 @@ The main variables are:
 | `EXTRACT_START_DATE` / `EXTRACT_END_DATE` | Replay window | `2020-11-01` for a smoke test |
 | `EXTRACT_LIMIT` | Maximum source events | `100` |
 | `PUBLISH_RATE_PER_SEC` | Publish pacing | `10` |
+| `REPLAY_BATCH_SIZE` | Raw payload strings per emulator message for bounded replays | `1` |
 | `BQ_MAX_QUERY_BYTES` | Per-query guard, in bytes | `134217728` (128 MiB) |
 | `BQ_USAGE_LOG` | Local job metrics | `build/bigquery_usage.jsonl` |
 | `BQ_MONTHLY_SCAN_BUDGET_GIB` | Self-imposed project warning budget | `50` |
@@ -144,9 +151,11 @@ Run from the repository root in Git Bash:
 bash scripts/run_emulator_replay.sh --load --timeout 240 --window 5
 ```
 
-This command manages the emulator, publisher, pipeline, and resource watchdog. The pipeline writes valid events to local JSONL before the loader sends them to BigQuery Raw. It stops consumer processes before stopping the emulator.
+This command manages the emulator, publisher, pipeline, and resource watchdog. The pipeline writes valid events to local JSONL before the loader sends them to BigQuery Raw. It checks child processes while publisher is running, limits that stage with `--publisher-timeout` (1,800 seconds by default), and stops consumers before stopping the emulator. If the pipeline exits early, the script fails instead of waiting for output that cannot arrive.
 
-The default test uses at most 100 events from 2020-11-01. A streaming pipeline appears active while it waits for emulator messages; that wait itself does not mean the query is stuck.
+The default test uses at most 100 events from 2020-11-01. A streaming pipeline appears active while it waits for emulator messages; check its liveness and the resource monitor if the replay seems slow. The separate `--timeout` controls only the wait for output to stabilize after publishing. Before loading raw, the script compares the publisher counters with valid events, dead letters and rows removed by quality rules. A stable file count alone does not prove that replay finished; `build/emulator_replay/replay_counts.json` is written only after accounting matches.
+
+For a bounded large replay, `REPLAY_BATCH_SIZE=64` can reduce emulator message overhead. Each raw payload string is still decoded and processed separately, including malformed records. Also set `BOUNDED_REPLAY=1` when the source size and expected count are known: the bounded collector pulls from the local subscription, persists and flushes a snapshot before acknowledging messages, then stops the emulator before DirectRunner runs on the snapshot. This is a bounded-research replay mode, not a claim about continuously draining a production stream. Use a fresh raw dataset for a new experiment rather than overwriting an older batch.
 
 For an existing raw batch, rebuild only the warehouse and inspect results:
 
@@ -199,6 +208,8 @@ GCP_PROJECT_ID=local-project DASHBOARD_DATA_SOURCE=mock PUBLISH_RATE_PER_SEC=0 \
 
 ### Sandbox: real data and warehouse
 
+The bounded collector is optional and is useful when the native streaming consumer cannot be shown to have finished a known batch. It collects and flushes the local snapshot before execution. In this mode, the broker is stopped before the bounded Beam read to release its RAM. Native streaming remains the default for the small fixture.
+
 Mount ADC read-only; never bake credentials into the image. `ADC_FILE` is a Linux/WSL path:
 
 ```bash
@@ -208,7 +219,18 @@ RAW_DATASET=marketing_dss_docker_tutorial \
   -f docker-compose.sandbox.yml up --build
 ```
 
-The replay service creates/loads the raw batch, builds the warehouse, checks the KPI views, and stops. Dashboard then starts with `DASHBOARD_DATA_SOURCE=bigquery`.
+For a large bounded replay, also set `BOUNDED_REPLAY=1`, choose a positive extraction limit from the batch metadata, and size the timeout from observed progress. The collector writes the snapshot before Beam runs; it does not turn a failed or partial replay into a warehouse result. This example matches the bounded settings used for the full-day test. Change the raw dataset, date and extraction limit for your own controlled run:
+
+```bash
+BOUNDED_REPLAY=1 REPLAY_BATCH_SIZE=64 EXTRACT_LIMIT=56742 \
+REPLAY_TIMEOUT_SEC=600 DEDUP_WINDOW_SEC=5 \
+ADC_FILE=/mnt/c/path/to/application_default_credentials.json \
+RAW_DATASET=marketing_dss_large_yyyymmdd \
+  docker compose --env-file .env -f docker-compose.yml \
+  -f docker-compose.sandbox.yml up --build
+```
+
+The replay service creates/loads the raw batch, builds the warehouse, checks the KPI views, and stops. Dashboard then starts with `DASHBOARD_DATA_SOURCE=bigquery`. Resource limits stay at 2 GiB for replay and 1 GiB for dashboard. The successful full-day run stopped the broker after snapshotting 887 messages, reconciled 56,742 publisher events with the transformed outputs, and loaded 56,741 valid events into a newly created raw table.
 
 Use a fresh dataset name for smoke tests. If the dataset already contains data, the non-empty-day guard stops loading. Use another dataset or explicitly add `REPLACE_RAW_DAY=1` only when replacing that test batch's whole daily table is intended.
 
@@ -255,7 +277,21 @@ Use a CSV snapshot when you want to present the warehouse without configuring a 
 3. In [Looker Studio](https://lookerstudio.google.com/), create a report and add the CSV files as file-based data sources.
 4. Use `event_date` for time, and dimensions such as `channel_group` and `device_category` in charts. Compute ratios from their underlying counts or revenue rather than averaging ratios across groups.
 
-A CSV is a **snapshot**, not a live BigQuery connection. Refresh it manually when the warehouse changes. Sandbox resources may expire, so recreating and exporting fresh data may be necessary.
+For a reproducible export with the existing per-query guard, use the provided helper rather than repeating the SQL manually:
+
+```bash
+python scripts/export_kpi_csv.py --start-date 2020-12-18 \
+  --end-date 2020-12-18 --out-dir build/dashboard_exports/20201218
+```
+
+It exports all three views with a snapshot limit of 10,000 rows per view, validates required fields and date values, and refuses to overwrite previous snapshots. `manifest.json` records the source, date range and row counts. Use a new output directory for each new experiment. Pair this with an actual render check of Streamlit against the Sandbox data:
+
+```bash
+python scripts/smoke_streamlit_sandbox.py --role all \
+  --output build/smoke_dashboard_20201218.json
+```
+
+A CSV is a **snapshot**, not a live BigQuery connection. Refresh it manually when the warehouse changes. Sandbox resources may expire, so recreating and exporting fresh data may be necessary. These commands do not create or host a report in Looker Studio; upload the exported files there manually.
 
 The optional BigQuery connector has separate billing-project requirements in [Google's connector documentation](https://support.google.com/looker-studio/answer/6370296?hl=en). That is an extension, not a requirement of the local emulator or the CSV presentation flow.
 
@@ -268,7 +304,7 @@ bash scripts/run_simulation.sh
 pytest tests -q
 ```
 
-The simulation uses a nine-line fixture to verify four valid events, two dead letters, and four quality-log rows.
+The simulation uses a nine-line fixture to verify four valid events, two dead letters, and four quality-log rows. The test suite also checks replay overwrite guards, bounded snapshot collection and acknowledgement, managed-process liveness, the three real KPI SQL views and source-item reconciliation, and bounded CSV export. The SQL fixtures use small in-memory SQLite cases with hand-calculated results. These tests need Bash and standard Python dependencies, not BigQuery credentials.
 
 For the full emulator route offline:
 
