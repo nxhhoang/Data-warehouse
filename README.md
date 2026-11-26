@@ -40,7 +40,7 @@ The current implementation has **4 fact tables and 8 dimension tables**, not 6. 
 - Validate malformed messages, remove duplicates, and record data-quality issues.
 - Keep four grains: event, session, purchase item, and item event.
 - Aggregate traffic, conversion funnels, revenue, events, and products.
-- Filter the dashboard by time, channel, campaign, device, country, and other attributes supported by each page.
+- Filter session KPIs by time, channel, source/medium, campaign, device, country and user type. Product analysis also supports source/medium, campaign and item category; country and user type do not apply to product data.
 - Use management tabs for CMO, Manager, and Specialist. These tabs only filter navigation; they are not access control.
 - Run manually on Windows, or with Docker on Linux/WSL.
 - Guard query sizes, throttle publishing, and track resource usage and process cleanup.
@@ -259,7 +259,7 @@ The smoke script removes its managed container afterward. The image remains avai
 
 ### Interactive dashboard in this repository
 
-Streamlit reads the same core, marts, and KPI views. The dashboard includes overview, performance comparison, channel quality, funnel analysis, drill-down, segmentation, alerts, scenario simulation, and source tracing.
+Streamlit reads Core/Marts and recomputes KPI ratios from the shared numerator and denominator definitions after filtering. It does not query the three KPI views; those views feed CSV exports for Looker Studio. The dashboard includes overview, performance comparison, channel quality, funnel analysis, drill-down, segmentation, alerts, scenario simulation, and source tracing.
 
 Use shared filters to narrow the analysis. The CMO, Manager, and Specialist tabs only change the available navigation pages; they do not grant or revoke permissions.
 
