@@ -5,8 +5,9 @@ Every page works on two pandas DataFrames whose columns are fixed below:
 - ``sessions``: one row per session, built from ``core.fct_sessions`` joined
   with its dimensions (~360k rows, loaded once and filtered in memory, so
   every filter combination can count distinct users).
-- ``products``: one row per date × product × channel group × device, from
-  ``marts.fct_product_channel_daily`` joined with its dimensions.
+- ``products``: product measures from ``marts.fct_product_channel_daily``
+  joined with its conformed dimensions at date × product × session source ×
+  device grain.
 
 Two sources return the same columns: ``mock`` (src/dashboard/mock.py, no GCP
 needed) and ``bigquery`` (the warehouse built by NXHH, datasets core / marts).
@@ -69,6 +70,8 @@ PRODUCT_COLUMNS = {
     "item_category": "string",
     "channel_group": "string",
     "device_category": "string",
+    "source_medium": "string",
+    "campaign": "string",
     "item_view_events": "int64",
     "item_add_to_cart_events": "int64",
     "item_checkout_events": "int64",
@@ -129,6 +132,8 @@ SELECT
     p.item_category,
     ts.channel_group,
     dev.device_category,
+    CONCAT(ts.source, ' / ', ts.medium) AS source_medium,
+    ts.campaign,
     SUM(f.item_view_events) AS item_view_events,
     SUM(f.item_add_to_cart_events) AS item_add_to_cart_events,
     SUM(f.item_checkout_events) AS item_checkout_events,
@@ -140,7 +145,7 @@ JOIN `{project}.core.dim_product` p ON f.product_key = p.product_key
 JOIN `{project}.core.dim_traffic_source` ts ON f.session_source_key = ts.traffic_source_key
 JOIN `{project}.core.dim_device` dev ON f.device_key = dev.device_key
 WHERE f.date_key > 0
-GROUP BY 1, 2, 3, 4, 5, 6, 7
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 """
 
 

@@ -198,6 +198,12 @@ def make_products(n_products: int = 150, seed: int = SEED) -> pd.DataFrame:
     grid["item_checkout_events"] = checkouts
     grid["units_sold"] = sold
     grid["item_revenue_usd"] = np.round(sold * grid["price"], 2)
+    # Expose the same conformed traffic attributes as the BigQuery product
+    # query, without adding fields that survive only in the mock source.
+    grid["source_medium"] = grid["channel_group"].map(
+        {name: f"{values[2]} / {values[3]}" for name, values in _CHANNELS.items()}
+    )
+    grid["campaign"] = rng.choice(_CAMPAIGNS, size=len(grid))
     # The real mart only has rows with at least one event or sale
     active = (views + checkouts + sold) > 0
     return (grid.loc[active]

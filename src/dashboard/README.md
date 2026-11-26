@@ -68,9 +68,11 @@ shared filters remain available to every role.
   Mô phỏng, Truy vết.
 - **Specialist**: Phễu, Chi tiết, Phân khúc, Truy vết.
 
-Choosing a new role opens that role's first page. Choosing a role whose set
-includes the current page keeps user context. Definitions are centralized in
-`src/dashboard/roles.py`, with tests in `tests/test_dashboard_roles.py`.
+Choosing a new role opens that role's first visible page. The selected role
+is restored with the same value across Streamlit reruns, including a temporary
+`None` widget state during navigation. Definitions are centralized in
+`src/dashboard/roles.py`, with tests in `tests/test_dashboard_roles.py` and
+`tests/test_dashboard_management_ui.py`.
 
 ## Layout
 
@@ -97,6 +99,10 @@ includes the current page keeps user context. Definitions are centralized in
 
 ## Rules
 
+- The shared sidebar filters date, channel, device, country, source/medium,
+  campaign, user type and product category. Product category applies only to
+  product data; country and user type apply only to session KPIs. Source/medium
+  and campaign are exposed on both frames through conformed dimensions.
 - Pages never query BigQuery directly; they use `ctx.filtered` / `ctx.filtered_products`.
 - Ratios are recomputed from numerators/denominators after filtering (`kpi.summarize`);
   never sum or average ratio columns.

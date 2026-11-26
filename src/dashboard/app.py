@@ -40,11 +40,20 @@ def main() -> None:
     st.set_page_config(page_title="Marketing DSS", page_icon=":material/insights:",
                        layout="wide")
     settings = get_settings()
+    resume_filters = st.session_state.pop("_resume_filters", None)
+    previous_role = st.session_state.get("_last_management_role") or "all"
+    # A segmented-control phase can briefly have no selection during a page
+    # switch. Restore the last known option before widget construction so the
+    # displayed role and its navigation never diverge.
+    if st.session_state.get("management_role") is None:
+        st.session_state["management_role"] = previous_role
     role = st.sidebar.segmented_control(
         "Chế độ quản lý", options=ROLE_OPTIONS,
-        format_func=ROLE_LABELS.get, default="all",
+        # Session state above owns the initial value across script phases.
+        format_func=ROLE_LABELS.get, default=None,
         selection_mode="single", key="management_role",
     )
+    role = role or previous_role
     try:
         sessions = cached_sessions(settings.data_source, settings.project_id)
         products = cached_products(settings.data_source, settings.project_id)
@@ -54,7 +63,9 @@ def main() -> None:
 
     if settings.data_source == "mock":
         st.sidebar.warning("Đang dùng dữ liệu giả lập (mock).", icon=":material/science:")
-    ctx = PageContext(settings, sessions, products, render_sidebar(sessions))
+    ctx = PageContext(
+        settings, sessions, products, render_sidebar(sessions, products, resume_filters)
+    )
 
     def page(fn, title, url_path, **kwargs):
         # Explicit url_path: lambdas have no meaningful __name__
@@ -81,6 +92,9 @@ def main() -> None:
     # Switch to the selected role's home only when the role itself changes.
     # Plain page-link navigation and direct URLs are handled by st.Page below.
     if st.session_state.get("_last_management_role") not in (None, role):
+        # switch_page starts a new script phase. Preserve both the active
+        # filters and the selected role before that phase loses widget state.
+        st.session_state["_resume_filters"] = ctx.filters
         st.session_state["_last_management_role"] = role
         st.switch_page(ctx.pages[visible_paths[0]])
     st.session_state["_last_management_role"] = role

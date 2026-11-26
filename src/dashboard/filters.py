@@ -4,7 +4,7 @@
 draws the Streamlit widgets and returns the chosen state.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import pandas as pd
 
@@ -23,10 +23,13 @@ class Filters:
     devices: tuple[str, ...] = field(default_factory=tuple)
     countries: tuple[str, ...] = field(default_factory=tuple)
     user_type: str = USER_TYPES[0]
+    source_mediums: tuple[str, ...] = field(default_factory=tuple)
+    campaigns: tuple[str, ...] = field(default_factory=tuple)
+    product_categories: tuple[str, ...] = field(default_factory=tuple)
 
     def with_dates(self, start: pd.Timestamp, end: pd.Timestamp) -> "Filters":
-        """Same dimension filters over another date range (period comparison)."""
-        return Filters(start, end, self.channels, self.devices, self.countries, self.user_type)
+        """Preserve every dimension while changing the comparison date range."""
+        return replace(self, start=start, end=end)
 
 
 def apply_filters(df: pd.DataFrame, f: Filters) -> pd.DataFrame:
@@ -38,6 +41,10 @@ def apply_filters(df: pd.DataFrame, f: Filters) -> pd.DataFrame:
         mask &= df["device_category"].isin(f.devices)
     if f.countries:
         mask &= df["country"].isin(f.countries)
+    if f.source_mediums:
+        mask &= df["source_medium"].isin(f.source_mediums)
+    if f.campaigns:
+        mask &= df["campaign"].isin(f.campaigns)
     if f.user_type == USER_TYPES[1]:
         mask &= df["is_new_user_session"] == 1
     elif f.user_type == USER_TYPES[2]:
@@ -46,16 +53,23 @@ def apply_filters(df: pd.DataFrame, f: Filters) -> pd.DataFrame:
 
 
 def apply_product_filters(df: pd.DataFrame, f: Filters) -> pd.DataFrame:
-    """Rows of the product frame matching the date, channel and device filters.
+    """Filter product rows on dimensions actually present in the product frame.
 
-    The product mart has no country or user-type dimension, so those two
-    filters do not apply to product figures.
+    Product rows have source/medium, campaign and item category through their
+    conformed dimensions. Country and user type belong to session data, so
+    those filters intentionally do not apply here.
     """
     mask = df["date"].between(f.start, f.end)
     if f.channels:
         mask &= df["channel_group"].isin(f.channels)
     if f.devices:
         mask &= df["device_category"].isin(f.devices)
+    if f.source_mediums:
+        mask &= df["source_medium"].isin(f.source_mediums)
+    if f.campaigns:
+        mask &= df["campaign"].isin(f.campaigns)
+    if f.product_categories:
+        mask &= df["item_category"].isin(f.product_categories)
     return df.loc[mask]
 
 
@@ -66,15 +80,40 @@ def _ordered(values: pd.Series, preferred: tuple[str, ...]) -> list[str]:
     return known + sorted(present - set(known))
 
 
-def render_sidebar(df: pd.DataFrame) -> Filters:
-    """Draw the filter widgets in the sidebar and return the chosen Filters."""
+def render_sidebar(df: pd.DataFrame, products: pd.DataFrame,
+                   resume_filters: "Filters | None" = None) -> Filters:
+    """Draw shared filters and restore a saved set after a role switch."""
     import streamlit as st
 
     min_date = df["session_date"].min().date()
     max_date = df["session_date"].max().date()
 
+    if resume_filters is not None:
+        saved_start = min(max(resume_filters.start.date(), min_date), max_date)
+        saved_end = min(max(resume_filters.end.date(), min_date), max_date)
+        st.session_state["f_dates"] = (saved_start, saved_end)
+        field_options = {
+            "f_channels": (resume_filters.channels, df["channel_group"]),
+            "f_devices": (resume_filters.devices, df["device_category"]),
+            "f_countries": (resume_filters.countries, df["country"]),
+            "f_source_mediums": (resume_filters.source_mediums, df["source_medium"]),
+            "f_campaigns": (resume_filters.campaigns, df["campaign"]),
+            "f_product_categories": (
+                resume_filters.product_categories, products["item_category"]
+            ),
+        }
+        for key, (saved, available) in field_options.items():
+            valid_values = set(available.dropna())
+            st.session_state[key] = [value for value in saved if value in valid_values]
+        st.session_state["f_user_type"] = (
+            resume_filters.user_type if resume_filters.user_type in USER_TYPES else USER_TYPES[0]
+        )
+
     panel = st.sidebar.expander("Bộ lọc", expanded=False)
-    panel.caption("Chức năng 2: áp dụng cho mọi trang.")
+    panel.caption(
+        "Các bộ lọc chỉ áp dụng khi dữ liệu có chiều tương ứng. Nhóm sản phẩm "
+        "chỉ lọc số liệu sản phẩm; quốc gia và loại người dùng chỉ lọc KPI theo phiên."
+    )
     picked = panel.date_input(
         "Khoảng thời gian", value=(min_date, max_date),
         min_value=min_date, max_value=max_date, format="DD/MM/YYYY", key="f_dates",
@@ -95,10 +134,24 @@ def render_sidebar(df: pd.DataFrame) -> Filters:
         "Quốc gia", df["country"].value_counts().index.tolist(),
         placeholder="Tất cả quốc gia", key="f_countries",
     )
+    source_mediums = panel.multiselect(
+        "Nguồn / medium", sorted(df["source_medium"].dropna().unique().tolist()),
+        placeholder="Tất cả nguồn / medium", key="f_source_mediums",
+    )
+    campaigns = panel.multiselect(
+        "Chiến dịch", sorted(df["campaign"].dropna().unique().tolist()),
+        placeholder="Tất cả chiến dịch", key="f_campaigns",
+    )
+    product_categories = panel.multiselect(
+        "Nhóm sản phẩm", sorted(products["item_category"].dropna().unique().tolist()),
+        placeholder="Tất cả nhóm sản phẩm", key="f_product_categories",
+    )
     user_type = panel.radio("Loại người dùng", USER_TYPES, key="f_user_type")
 
     return Filters(
         start=pd.Timestamp(start), end=pd.Timestamp(end),
         channels=tuple(channels), devices=tuple(devices),
         countries=tuple(countries), user_type=user_type,
+        source_mediums=tuple(source_mediums), campaigns=tuple(campaigns),
+        product_categories=tuple(product_categories),
     )

@@ -157,10 +157,14 @@ def verification_sql(kpi_id: str, filters: Filters, project: str) -> tuple[str, 
                            ("end_date", "DATE", filters.end.date())]
     for column, values, name in (("ts.channel_group", filters.channels, "channels"),
                                  ("dev.device_category", filters.devices, "devices"),
-                                 ("geo.country", filters.countries, "countries")):
+                                 ("geo.country", filters.countries, "countries"),
+                                 ("ts.campaign", filters.campaigns, "campaigns")):
         if values:
             where.append(f"{column} IN UNNEST(@{name})")
             params.append((name, "STRING", list(values)))
+    if filters.source_mediums:
+        where.append("CONCAT(ts.source, ' / ', ts.medium) IN UNNEST(@source_mediums)")
+        params.append(("source_mediums", "STRING", list(filters.source_mediums)))
     if filters.user_type == USER_TYPES[1]:
         where.append("s.is_new_user_session = 1")
     elif filters.user_type == USER_TYPES[2]:

@@ -406,15 +406,19 @@ def test_lineage_dot_lists_every_layer():
 
 def test_verification_sql_applies_every_filter():
     f = Filters(pd.Timestamp("2020-12-01"), pd.Timestamp("2020-12-31"), channels=("Direct",),
-                devices=("mobile",), countries=("Vietnam",), user_type="Người dùng mới")
+                devices=("mobile",), countries=("Vietnam",), user_type="Người dùng mới",
+                source_mediums=("google / organic",), campaigns=("Data Share Promo",))
     sql, params = trace.verification_sql("aov_usd", f, "proj")
     assert "SUM(s.revenue_usd) AS numerator" in sql
     assert "SUM(s.order_count) AS denominator" in sql
     for clause in ("ts.channel_group IN UNNEST(@channels)", "dev.device_category IN UNNEST(@devices)",
-                   "geo.country IN UNNEST(@countries)", "s.is_new_user_session = 1"):
+                   "geo.country IN UNNEST(@countries)", "s.is_new_user_session = 1",
+                   "ts.campaign IN UNNEST(@campaigns)",
+                   "CONCAT(ts.source, ' / ', ts.medium) IN UNNEST(@source_mediums)"):
         assert clause in sql
     names = {n for n, _, _ in params}
-    assert names == {"start_date", "end_date", "channels", "devices", "countries"}
+    assert names == {"start_date", "end_date", "channels", "devices", "countries",
+                     "source_mediums", "campaigns"}
 
 
 def test_data_gap_note_lists_every_overlapping_gap():

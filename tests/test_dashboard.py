@@ -303,6 +303,34 @@ def test_empty_filter_keeps_everything_in_range(sessions):
     assert len(apply_filters(sessions, f)) == len(sessions)
 
 
+def test_source_and_campaign_filters_are_applied_and_survive_date_changes(sessions):
+    row = sessions.iloc[0]
+    f = Filters(sessions["session_date"].min(), sessions["session_date"].max(),
+                source_mediums=(row["source_medium"],), campaigns=(row["campaign"],))
+    out = apply_filters(sessions, f)
+    assert not out.empty
+    assert set(out["source_medium"]) == {row["source_medium"]}
+    assert set(out["campaign"]) == {row["campaign"]}
+    shifted = f.with_dates(pd.Timestamp("2020-12-01"), f.end)
+    assert shifted.start == pd.Timestamp("2020-12-01") and shifted.end == f.end
+    for name in ("channels", "devices", "countries", "user_type",
+                 "source_mediums", "campaigns", "product_categories"):
+        assert getattr(shifted, name) == getattr(f, name)
+
+
+def test_product_filters_cover_source_campaign_and_category():
+    products = load_products(MOCK)
+    row = products.iloc[0]
+    f = Filters(products["date"].min(), products["date"].max(),
+                source_mediums=(row["source_medium"],), campaigns=(row["campaign"],),
+                product_categories=(row["item_category"],))
+    out = apply_product_filters(products, f)
+    assert not out.empty
+    assert set(out["source_medium"]) == {row["source_medium"]}
+    assert set(out["campaign"]) == {row["campaign"]}
+    assert set(out["item_category"]) == {row["item_category"]}
+
+
 # ---------- formatting ----------
 
 @pytest.mark.parametrize("value, unit, expected", [

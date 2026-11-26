@@ -19,7 +19,10 @@ SHOWN_RECORDS = 200
 def _filter_summary(ctx: PageContext) -> str:
     f = ctx.filters
     parts = [f"{f.start:%d/%m/%Y} – {f.end:%d/%m/%Y}"]
-    for label, values in (("Kênh", f.channels), ("Thiết bị", f.devices), ("Quốc gia", f.countries)):
+    for label, values in (("Kênh", f.channels), ("Thiết bị", f.devices),
+                          ("Quốc gia", f.countries),
+                          ("Nguồn / medium", f.source_mediums),
+                          ("Chiến dịch", f.campaigns)):
         if values:
             parts.append(f"{label}: {', '.join(values)}")
     if f.user_type != USER_TYPES[0]:
