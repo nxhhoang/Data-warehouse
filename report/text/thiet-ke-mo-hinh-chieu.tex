@@ -5,6 +5,13 @@ Mô hình được thiết kế theo hướng Kimball cho quá trình truy cập
 
 Ba bảng staging (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}, \texttt{stg\_valid\_orders}) là view dùng để chuẩn hóa nguồn, làm phẳng tham số và mặt hàng, khử trùng sự kiện và xác định giao dịch hợp lệ. Các bảng fact và dimension trong \texttt{core} là bảng vật lý. Các bảng trong \texttt{marts} tổng hợp số đo theo grain phục vụ báo cáo, còn ba KPI view tính tỷ lệ từ cùng một tập tử số và mẫu số.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{image/drawio/star_schema.drawio.png}
+  \caption{Lược đồ mô hình chiều của kho dữ liệu.}
+  \label{fig:star-schema}
+\end{figure}
+
 \subsubsection{Grain của bốn bảng fact}
 
 \begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
