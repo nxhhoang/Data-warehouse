@@ -91,7 +91,7 @@
 \subtitle{}
 
 \author[DW and DSS for Marketing] % (optional)
-{Supervisor: Võ Thị Ngọc Châu \\
+{Supervisor: Assoc. Prof. Dr. Võ Thị Ngọc Châu \\
   Student: Nguyễn Xuân Huy Hoàng - 2311070\\
   Student: Trần Vĩnh Dũng - 2310574\\
   Student: Bùi Trọng Hiển - 2310993
@@ -169,491 +169,491 @@
   \tableofcontents
 \end{frame}
 
-%---------------------------------------------------------
-\section{Giới thiệu}
-%---------------------------------------------------------
+% %---------------------------------------------------------
+% \section{Giới thiệu}
+% %---------------------------------------------------------
 
-\begin{frame}{Tổng quan dự án}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.55\textwidth}
-    \begin{itemize}
-      \setlength{\itemsep}{0.5em}
-      \item \textbf{Vấn đề:} dữ liệu marketing đa kênh
-        \textbf{phân tán}, chỉ số \textbf{không thống nhất}
-        $\rightarrow$ khó có góc nhìn tổng thể, kịp thời.
-      \item \textbf{Giải pháp:} DSS cho marketing số\\
-        dữ liệu $\rightarrow$ kho dữ liệu $\rightarrow$ KPI
-        $\rightarrow$ dashboard.
-      \item \textbf{Đối tượng:} doanh nghiệp TMĐT
-        \textbf{vừa và nhỏ} chạy quảng cáo đa kênh.
-    \end{itemize}
-    \column{0.4\textwidth}
-    \begin{block}{Mục tiêu chính}
-      \scriptsize
-      \begin{itemize}
-        \setlength{\itemsep}{0.3em}
-        \item Kho dữ liệu tập trung + ETL/ELT, kiểm tra chất lượng
-        \item Hệ KPI với \textbf{định nghĩa duy nhất}
-        \item Dashboard hỗ trợ ra quyết định
-        \item Đánh giá: đúng đắn, nhất quán, hiệu năng
-      \end{itemize}
-    \end{block}
-  \end{columns}
-  \vfill
-  {\footnotesize \textbf{Dữ liệu:} GA4 Merchandise Store
-  (\texttt{ga4\_obfuscated\_sample\_ecommerce}), 92 ngày, 11/2020--01/2021.}
-\end{frame}
+% \begin{frame}{Tổng quan dự án}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.55\textwidth}
+%     \begin{itemize}
+%       \setlength{\itemsep}{0.5em}
+%       \item \textbf{Vấn đề:} dữ liệu marketing đa kênh
+%         \textbf{phân tán}, chỉ số \textbf{không thống nhất}
+%         $\rightarrow$ khó có góc nhìn tổng thể, kịp thời.
+%       \item \textbf{Giải pháp:} DSS cho marketing số\\
+%         dữ liệu $\rightarrow$ kho dữ liệu $\rightarrow$ KPI
+%         $\rightarrow$ dashboard.
+%       \item \textbf{Đối tượng:} doanh nghiệp TMĐT
+%         \textbf{vừa và nhỏ} chạy quảng cáo đa kênh.
+%     \end{itemize}
+%     \column{0.4\textwidth}
+%     \begin{block}{Mục tiêu chính}
+%       \scriptsize
+%       \begin{itemize}
+%         \setlength{\itemsep}{0.3em}
+%         \item Kho dữ liệu tập trung + ETL/ELT, kiểm tra chất lượng
+%         \item Hệ KPI với \textbf{định nghĩa duy nhất}
+%         \item Dashboard hỗ trợ ra quyết định
+%         \item Đánh giá: đúng đắn, nhất quán, hiệu năng
+%       \end{itemize}
+%     \end{block}
+%   \end{columns}
+%   \vfill
+%   {\footnotesize \textbf{Dữ liệu:} GA4 Merchandise Store
+%   (\texttt{ga4\_obfuscated\_sample\_ecommerce}), 92 ngày, 11/2020--01/2021.}
+% \end{frame}
 
-%---------------------------------------------------------
-\section{Bài toán nghiệp vụ}
-%---------------------------------------------------------
+% %---------------------------------------------------------
+% \section{Bài toán nghiệp vụ}
+% %---------------------------------------------------------
 
-\begin{frame}{Bối cảnh tổ chức và người ra quyết định}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.5\textwidth}
-    \begin{itemize}
-      \setlength{\itemsep}{0.4em}
-      \item Doanh nghiệp bán lẻ / TMĐT \textbf{vừa và nhỏ}, chạy
-        quảng cáo đa kênh.
-      \item Dữ liệu \textbf{xuất riêng} từng nền tảng, lưu trong
-        bảng tính rời rạc, định nghĩa chuyển đổi \textbf{khác nhau}.
-      \item \textbf{Câu hỏi thường xuyên:}
-        \begin{itemize}
-          \setlength{\itemsep}{0.1em}
-          \item Chiến dịch / kênh nào hiệu quả hơn?
-          \item Hiệu suất thay đổi ra sao theo tháng?
-          \item Chiến dịch nào cần rà soát?
-        \end{itemize}
-    \end{itemize}
-    \column{0.46\textwidth}
-    \centering
-    \renewcommand{\arraystretch}{1.3}
-    \footnotesize
-    \begin{tabular}{@{}p{2.2cm}p{3.3cm}@{}}
-      \toprule
-      \textbf{Người ra quyết định} & \textbf{Nhu cầu chính} \\
-      \midrule
-      Giám đốc Marketing & Đánh giá hiệu quả kênh, định hướng phân bổ nguồn lực \\
-      Quản lý Marketing số & So sánh chiến dịch, phát hiện bất thường \\
-      Chuyên viên TMĐT & Theo dõi phễu chuyển đổi, cải thiện nội dung \\
-      \bottomrule
-    \end{tabular}
-  \end{columns}
-\end{frame}
+% \begin{frame}{Bối cảnh tổ chức và người ra quyết định}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.5\textwidth}
+%     \begin{itemize}
+%       \setlength{\itemsep}{0.4em}
+%       \item Doanh nghiệp bán lẻ / TMĐT \textbf{vừa và nhỏ}, chạy
+%         quảng cáo đa kênh.
+%       \item Dữ liệu \textbf{xuất riêng} từng nền tảng, lưu trong
+%         bảng tính rời rạc, định nghĩa chuyển đổi \textbf{khác nhau}.
+%       \item \textbf{Câu hỏi thường xuyên:}
+%         \begin{itemize}
+%           \setlength{\itemsep}{0.1em}
+%           \item Chiến dịch / kênh nào hiệu quả hơn?
+%           \item Hiệu suất thay đổi ra sao theo tháng?
+%           \item Chiến dịch nào cần rà soát?
+%         \end{itemize}
+%     \end{itemize}
+%     \column{0.46\textwidth}
+%     \centering
+%     \renewcommand{\arraystretch}{1.3}
+%     \footnotesize
+%     \begin{tabular}{@{}p{2.2cm}p{3.3cm}@{}}
+%       \toprule
+%       \textbf{Người ra quyết định} & \textbf{Nhu cầu chính} \\
+%       \midrule
+%       Giám đốc Marketing & Đánh giá hiệu quả kênh, định hướng phân bổ nguồn lực \\
+%       Quản lý Marketing số & So sánh chiến dịch, phát hiện bất thường \\
+%       Chuyên viên TMĐT & Theo dõi phễu chuyển đổi, cải thiện nội dung \\
+%       \bottomrule
+%     \end{tabular}
+%   \end{columns}
+% \end{frame}
 
-\begin{frame}{Phát biểu vấn đề kinh doanh}
-  \small
-  \begin{block}{Vấn đề kinh doanh}
-    Thiếu quy trình phân tích \textbf{tích hợp, nhất quán, lặp lại
-    được} $\rightarrow$ khó so sánh chi phí, chuyển đổi, doanh thu
-    giữa các chiến dịch, làm giảm chất lượng quyết định
-    \textbf{tối ưu chiến dịch} và \textbf{phân bổ ngân sách}.
-  \end{block}
-  \vspace{0.2cm}
-  \begin{enumerate}
-    \setlength{\itemsep}{0.4em}
-    \item \textbf{Dữ liệu phân tán:} thiếu tích hợp, chuẩn hóa thủ công, dễ sai sót
-    \item \textbf{Chỉ số không thống nhất:} khó đánh giá chiến dịch
-      toàn diện 
-    \item \textbf{Thiếu góc nhìn hành vi:} phễu mua hàng, phân khúc
-      khách hàng
-    \item \textbf{Báo cáo chậm, thiếu nhất quán:} khó dự báo, phân
-      bổ ngân sách thiếu căn cứ
-  \end{enumerate}
-\end{frame}
+% \begin{frame}{Phát biểu vấn đề kinh doanh}
+%   \small
+%   \begin{block}{Vấn đề kinh doanh}
+%     Thiếu quy trình phân tích \textbf{tích hợp, nhất quán, lặp lại
+%     được} $\rightarrow$ khó so sánh chi phí, chuyển đổi, doanh thu
+%     giữa các chiến dịch, làm giảm chất lượng quyết định
+%     \textbf{tối ưu chiến dịch} và \textbf{phân bổ ngân sách}.
+%   \end{block}
+%   \vspace{0.2cm}
+%   \begin{enumerate}
+%     \setlength{\itemsep}{0.4em}
+%     \item \textbf{Dữ liệu phân tán:} thiếu tích hợp, chuẩn hóa thủ công, dễ sai sót
+%     \item \textbf{Chỉ số không thống nhất:} khó đánh giá chiến dịch
+%       toàn diện 
+%     \item \textbf{Thiếu góc nhìn hành vi:} phễu mua hàng, phân khúc
+%       khách hàng
+%     \item \textbf{Báo cáo chậm, thiếu nhất quán:} khó dự báo, phân
+%       bổ ngân sách thiếu căn cứ
+%   \end{enumerate}
+% \end{frame}
 
-%---------------------------------------------------------
-\section{Giải pháp đề xuất và kiến trúc}
-%---------------------------------------------------------
+% %---------------------------------------------------------
+% \section{Giải pháp đề xuất và kiến trúc}
+% %---------------------------------------------------------
 
-\begin{frame}{Tổng quan giải pháp}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.56\textwidth}
-    \begin{enumerate}
-        \setlength{\itemsep}{0.35em}
-      \item \textbf{Tích hợp dữ liệu:} trích xuất sự kiện từ nguồn,
-        đưa về \textbf{một cấu trúc thống nhất}.
-      \item \textbf{Kho dữ liệu:} lưu dữ liệu chuẩn hóa theo
-        \textbf{mô hình chiều} (dimensional model) -- phân tích
-        theo thời gian, kênh, chiến dịch, thiết bị, địa lý, sản phẩm.
-      \item \textbf{Hệ thống chỉ số (KPI):} tính toán theo
-        \textbf{một bộ định nghĩa duy nhất}, dùng chung cho mọi
-        báo cáo.
-      \item \textbf{Ứng dụng DSS:} dashboard có bộ lọc, so sánh
-        hiệu suất, cảnh báo theo ngưỡng, mô phỏng kịch bản.
-    \end{enumerate}
-    \column{0.40\textwidth}
-    \begin{block}{Kết quả hướng đến}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item Mọi con số \textbf{truy vết được} về dữ liệu gốc
-        \item Kênh / chiến dịch được so sánh trên \textbf{cùng một
-          định nghĩa chỉ số}
-        \item Từ \textbf{quan sát} $\rightarrow$ \textbf{hành động}:
-          ưu tiên kênh, sửa điểm rơi phễu, rà soát ngân sách
-      \end{itemize}
-    \end{block}
-    \vspace{0.15cm}
-    \begin{exampleblock}{Lưu ý}
-      \scriptsize
-      Dữ liệu không có chi phí quảng cáo $\rightarrow$ hiệu quả
-      được đánh giá qua \textbf{lưu lượng, hành vi, chuyển đổi,
-      doanh thu}.
-    \end{exampleblock}
-  \end{columns}
-\end{frame}
+% \begin{frame}{Tổng quan giải pháp}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.56\textwidth}
+%     \begin{enumerate}
+%         \setlength{\itemsep}{0.35em}
+%       \item \textbf{Tích hợp dữ liệu:} trích xuất sự kiện từ nguồn,
+%         đưa về \textbf{một cấu trúc thống nhất}.
+%       \item \textbf{Kho dữ liệu:} lưu dữ liệu chuẩn hóa theo
+%         \textbf{mô hình chiều} (dimensional model) -- phân tích
+%         theo thời gian, kênh, chiến dịch, thiết bị, địa lý, sản phẩm.
+%       \item \textbf{Hệ thống chỉ số (KPI):} tính toán theo
+%         \textbf{một bộ định nghĩa duy nhất}, dùng chung cho mọi
+%         báo cáo.
+%       \item \textbf{Ứng dụng DSS:} dashboard có bộ lọc, so sánh
+%         hiệu suất, cảnh báo theo ngưỡng, mô phỏng kịch bản.
+%     \end{enumerate}
+%     \column{0.40\textwidth}
+%     \begin{block}{Kết quả hướng đến}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item Mọi con số \textbf{truy vết được} về dữ liệu gốc
+%         \item Kênh / chiến dịch được so sánh trên \textbf{cùng một
+%           định nghĩa chỉ số}
+%         \item Từ \textbf{quan sát} $\rightarrow$ \textbf{hành động}:
+%           ưu tiên kênh, sửa điểm rơi phễu, rà soát ngân sách
+%       \end{itemize}
+%     \end{block}
+%     \vspace{0.15cm}
+%     \begin{exampleblock}{Lưu ý}
+%       \scriptsize
+%       Dữ liệu không có chi phí quảng cáo $\rightarrow$ hiệu quả
+%       được đánh giá qua \textbf{lưu lượng, hành vi, chuyển đổi,
+%       doanh thu}.
+%     \end{exampleblock}
+%   \end{columns}
+% \end{frame}
 
-\begin{frame}{Kiến trúc hệ thống -- năm tầng}
-  \centering
-  \begin{tikzpicture}[
-      >=stealth,
-      svc/.style={
-        draw, rounded corners=3pt, align=center,
-        minimum width=2.4cm, text width=2.3cm,
-        minimum height=1.0cm,
-        inner sep=2pt, font=\scriptsize
-      },
-      arr/.style={->, thick},
-      tier/.style={font=\tiny\bfseries, text=BKTemplate},
-      lbl/.style={font=\tiny, inner sep=1pt}
-    ]
+% \begin{frame}{Kiến trúc hệ thống -- năm tầng}
+%   \centering
+%   \begin{tikzpicture}[
+%       >=stealth,
+%       svc/.style={
+%         draw, rounded corners=3pt, align=center,
+%         minimum width=2.4cm, text width=2.3cm,
+%         minimum height=1.0cm,
+%         inner sep=2pt, font=\scriptsize
+%       },
+%       arr/.style={->, thick},
+%       tier/.style={font=\tiny\bfseries, text=BKTemplate},
+%       lbl/.style={font=\tiny, inner sep=1pt}
+%     ]
 
-    % ===== Các tầng chính =====
-    \node[svc, fill=gray!15]    (src) at (0,0)     {\textbf{BigQuery}\\ GA4 \texttt{events\_YYYYMMDD}};
-    \node[svc, fill=blue!12]    (pub) at (2.95,0)  {\textbf{Python Publisher}\\ trích xuất theo ngày};
-    \node[svc, fill=cyan!15]    (ps)  at (5.9,0)   {\textbf{Pub/Sub}\\ thông điệp JSON};
-    \node[svc, fill=orange!20] (df)  at (8.85,0)   {\textbf{Dataflow}\\ biến đổi + kiểm tra chất lượng};
-    \node[svc, fill=green!15]   (dw)  at (11.8,0)   {\textbf{BigQuery + dbt}\\ mô hình sao, bảng tổng hợp};
+%     % ===== Các tầng chính =====
+%     \node[svc, fill=gray!15]    (src) at (0,0)     {\textbf{BigQuery}\\ GA4 \texttt{events\_YYYYMMDD}};
+%     \node[svc, fill=blue!12]    (pub) at (2.95,0)  {\textbf{Python Publisher}\\ trích xuất theo ngày};
+%     \node[svc, fill=cyan!15]    (ps)  at (5.9,0)   {\textbf{Pub/Sub}\\ thông điệp JSON};
+%     \node[svc, fill=orange!20] (df)  at (8.85,0)   {\textbf{Dataflow}\\ biến đổi + kiểm tra chất lượng};
+%     \node[svc, fill=green!15]   (dw)  at (11.8,0)   {\textbf{BigQuery + dbt}\\ mô hình sao, bảng tổng hợp};
 
-    % ===== Luồng phụ =====
-    \node[svc, fill=red!10, dashed] (dl)  at (8.85,-1.7) {\textbf{Dead-letter topic}\\ thông điệp lỗi};
-    \node[svc, fill=purple!15]      (dss) at (11.8,-1.7) {\textbf{Dashboard DSS}\\ KPI, bộ lọc, cảnh báo, mô phỏng};
+%     % ===== Luồng phụ =====
+%     \node[svc, fill=red!10, dashed] (dl)  at (8.85,-1.7) {\textbf{Dead-letter topic}\\ thông điệp lỗi};
+%     \node[svc, fill=purple!15]      (dss) at (11.8,-1.7) {\textbf{Dashboard DSS}\\ KPI, bộ lọc, cảnh báo, mô phỏng};
 
-    % ===== Nhãn tầng =====
-    \node[tier] at (0,0.8)     {Tầng 1: Nguồn};
-    \node[tier] at (4.425,0.8) {Tầng 2: Thu thập};
-    \node[tier] at (8.85,0.8)  {Tầng 3: Xử lý};
-    \node[tier] at (11.8,0.8)  {Tầng 4: Kho dữ liệu};
-    \node[tier] at (11.8,-2.6) {Tầng 5: Phân tích \& ứng dụng};
+%     % ===== Nhãn tầng =====
+%     \node[tier] at (0,0.8)     {Tầng 1: Nguồn};
+%     \node[tier] at (4.425,0.8) {Tầng 2: Thu thập};
+%     \node[tier] at (8.85,0.8)  {Tầng 3: Xử lý};
+%     \node[tier] at (11.8,0.8)  {Tầng 4: Kho dữ liệu};
+%     \node[tier] at (11.8,-2.6) {Tầng 5: Phân tích \& ứng dụng};
 
-    % ===== Mũi tên =====
-    \draw[arr] (src) -- (pub);
-    \draw[arr] (pub) -- (ps);
-    \draw[arr] (ps)  -- (df);
-    \draw[arr] (df)  -- (dw);
-    \draw[arr] (dw)  -- (dss);
-    \draw[arr] (df)  -- node[right=1pt, lbl] {lỗi} (dl);
-  \end{tikzpicture}
+%     % ===== Mũi tên =====
+%     \draw[arr] (src) -- (pub);
+%     \draw[arr] (pub) -- (ps);
+%     \draw[arr] (ps)  -- (df);
+%     \draw[arr] (df)  -- (dw);
+%     \draw[arr] (dw)  -- (dss);
+%     \draw[arr] (df)  -- node[right=1pt, lbl] {lỗi} (dl);
+%   \end{tikzpicture}
 
-  \vspace{0.15cm}
-  \begin{flushleft}
-    \scriptsize
-    \textbf{Luồng chính:} GA4 (BigQuery) $\rightarrow$ Publisher
-    $\rightarrow$ Pub/Sub $\rightarrow$ Dataflow $\rightarrow$
-    kho dữ liệu (dbt) $\rightarrow$ Dashboard.\\
-    \textbf{Biến đổi tại Dataflow:} giải mã JSON, chuẩn hóa kiểu
-    dữ liệu / thời gian, làm phẳng \texttt{event\_params},
-    \texttt{items}, dựng định danh phiên, phát hiện trùng lặp và
-    bản ghi không hợp lệ.\\
-    \textbf{Chất lượng dữ liệu:} thông điệp lỗi $\rightarrow$
-    dead-letter topic; các vấn đề dữ liệu được \textbf{ghi nhật ký}
-    để truy vết.
-  \end{flushleft}
-\end{frame}
+%   \vspace{0.15cm}
+%   \begin{flushleft}
+%     \scriptsize
+%     \textbf{Luồng chính:} GA4 (BigQuery) $\rightarrow$ Publisher
+%     $\rightarrow$ Pub/Sub $\rightarrow$ Dataflow $\rightarrow$
+%     kho dữ liệu (dbt) $\rightarrow$ Dashboard.\\
+%     \textbf{Biến đổi tại Dataflow:} giải mã JSON, chuẩn hóa kiểu
+%     dữ liệu / thời gian, làm phẳng \texttt{event\_params},
+%     \texttt{items}, dựng định danh phiên, phát hiện trùng lặp và
+%     bản ghi không hợp lệ.\\
+%     \textbf{Chất lượng dữ liệu:} thông điệp lỗi $\rightarrow$
+%     dead-letter topic; các vấn đề dữ liệu được \textbf{ghi nhật ký}
+%     để truy vết.
+%   \end{flushleft}
+% \end{frame}
 
-\begin{frame}{Dữ liệu nguồn -- bộ dữ liệu GA4}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.56\textwidth}
-    \centering
-    \renewcommand{\arraystretch}{1.15}
-    \scriptsize
-    \begin{tabular}{@{}p{1.85cm}p{2.45cm}p{2.35cm}@{}}
-      \toprule
-      \textbf{Nhóm thông tin} & \textbf{Trường tiêu biểu} & \textbf{Mục đích} \\
-      \midrule
-      Thời gian & \texttt{event\_date}, \texttt{event\_timestamp} & Xu hướng ngày / tuần / tháng \\
-      Người dùng, phiên & \texttt{user\_pseudo\_id}, \texttt{ga\_session\_id} & Đếm người dùng, phiên \\
-      Sự kiện & \texttt{event\_name}: \texttt{page\_view}, \texttt{view\_item}, \texttt{add\_to\_cart}, \texttt{begin\_checkout}, \texttt{purchase} & Phễu chuyển đổi \\
-      Nguồn truy cập & \texttt{traffic\_source}: \texttt{source}, \texttt{medium}, \texttt{name} & So sánh kênh, chiến dịch \\
-      Thiết bị, địa lý & \texttt{device}, \texttt{geo} & Phân khúc khách hàng \\
-      TMĐT & \texttt{ecommerce}, \texttt{items} & Doanh thu, đơn hàng, sản phẩm \\
-      \bottomrule
-    \end{tabular}
-    \column{0.40\textwidth}
-    \begin{block}{Đặc điểm và giới hạn}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item \textbf{92 ngày}: 01/11/2020 -- 31/01/2021
-        \item \textbf{Đã làm mờ}: giá trị \texttt{\textless Other\textgreater},
-          \texttt{NULL} $\rightarrow$ ETL phải kiểm tra, làm sạch,
-          ghi nhận
-        \item \textbf{Không có chi phí quảng cáo}
-          $\rightarrow$ không tính CPA, ROAS, CPC
-        \item Hiệu quả đánh giá qua \textbf{lưu lượng, hành vi,
-          chuyển đổi, doanh thu}
-        \item Thiết kế cho phép \textbf{mở rộng} nguồn: Google /
-          Meta / TikTok Ads, email
-      \end{itemize}
-    \end{block}
-  \end{columns}
-\end{frame}
+% \begin{frame}{Dữ liệu nguồn -- bộ dữ liệu GA4}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.56\textwidth}
+%     \centering
+%     \renewcommand{\arraystretch}{1.15}
+%     \scriptsize
+%     \begin{tabular}{@{}p{1.85cm}p{2.45cm}p{2.35cm}@{}}
+%       \toprule
+%       \textbf{Nhóm thông tin} & \textbf{Trường tiêu biểu} & \textbf{Mục đích} \\
+%       \midrule
+%       Thời gian & \texttt{event\_date}, \texttt{event\_timestamp} & Xu hướng ngày / tuần / tháng \\
+%       Người dùng, phiên & \texttt{user\_pseudo\_id}, \texttt{ga\_session\_id} & Đếm người dùng, phiên \\
+%       Sự kiện & \texttt{event\_name}: \texttt{page\_view}, \texttt{view\_item}, \texttt{add\_to\_cart}, \texttt{begin\_checkout}, \texttt{purchase} & Phễu chuyển đổi \\
+%       Nguồn truy cập & \texttt{traffic\_source}: \texttt{source}, \texttt{medium}, \texttt{name} & So sánh kênh, chiến dịch \\
+%       Thiết bị, địa lý & \texttt{device}, \texttt{geo} & Phân khúc khách hàng \\
+%       TMĐT & \texttt{ecommerce}, \texttt{items} & Doanh thu, đơn hàng, sản phẩm \\
+%       \bottomrule
+%     \end{tabular}
+%     \column{0.40\textwidth}
+%     \begin{block}{Đặc điểm và giới hạn}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item \textbf{92 ngày}: 01/11/2020 -- 31/01/2021
+%         \item \textbf{Đã làm mờ}: giá trị \texttt{\textless Other\textgreater},
+%           \texttt{NULL} $\rightarrow$ ETL phải kiểm tra, làm sạch,
+%           ghi nhận
+%         \item \textbf{Không có chi phí quảng cáo}
+%           $\rightarrow$ không tính CPA, ROAS, CPC
+%         \item Hiệu quả đánh giá qua \textbf{lưu lượng, hành vi,
+%           chuyển đổi, doanh thu}
+%         \item Thiết kế cho phép \textbf{mở rộng} nguồn: Google /
+%           Meta / TikTok Ads, email
+%       \end{itemize}
+%     \end{block}
+%   \end{columns}
+% \end{frame}
 
-\begin{frame}{Kho dữ liệu -- mô hình sao (Star Schema)}
-  \centering
-  \begin{tikzpicture}[
-      fact/.style={
-        draw=BKTemplate, fill=BKTemplate!12, rounded corners=2pt,
-        align=center, minimum width=3.3cm, minimum height=1.15cm,
-        font=\scriptsize
-      },
-      dim/.style={
-        draw=BKTemplate!80, fill=gray!10, rounded corners=2pt,
-        align=center, minimum width=2.05cm, text width=1.95cm,
-        minimum height=0.5cm, inner sep=2pt, font=\tiny
-      },
-      line/.style={BKTemplate!70, thick}
-    ]
+% \begin{frame}{Kho dữ liệu -- mô hình sao (Star Schema)}
+%   \centering
+%   \begin{tikzpicture}[
+%       fact/.style={
+%         draw=BKTemplate, fill=BKTemplate!12, rounded corners=2pt,
+%         align=center, minimum width=3.3cm, minimum height=1.15cm,
+%         font=\scriptsize
+%       },
+%       dim/.style={
+%         draw=BKTemplate!80, fill=gray!10, rounded corners=2pt,
+%         align=center, minimum width=2.05cm, text width=1.95cm,
+%         minimum height=0.5cm, inner sep=2pt, font=\tiny
+%       },
+%       line/.style={BKTemplate!70, thick}
+%     ]
 
-    \node[fact] (fct) at (0,0) {\textbf{Bảng fact}\\ \texttt{fct\_events}\\ \texttt{fct\_purchase\_items}};
+%     \node[fact] (fct) at (0,0) {\textbf{Bảng fact}\\ \texttt{fct\_events}\\ \texttt{fct\_purchase\_items}};
 
-    \node[dim] (d1) at (0,1.95)     {\texttt{dim\_date}\\ (thời gian)};
-    \node[dim] (d2) at (-2.55,1.35) {\texttt{dim\_event}\\ (sự kiện)};
-    \node[dim] (d3) at (-3.55,0)    {\texttt{dim\_user}\\ (người dùng)};
-    \node[dim] (d4) at (-2.55,-1.35){\texttt{dim\_device}\\ (thiết bị)};
-    \node[dim] (d5) at (0,-1.95)    {\texttt{dim\_geo}\\ (địa lý)};
-    \node[dim] (d6) at (2.55,-1.35) {\texttt{dim\_page}\\ (trang)};
-    \node[dim] (d7) at (3.55,0)     {\texttt{dim\_product}\\ (sản phẩm)};
-    \node[dim] (d8) at (2.55,1.35)  {\texttt{dim\_traffic\_source}\\ (nguồn truy cập)};
+%     \node[dim] (d1) at (0,1.95)     {\texttt{dim\_date}\\ (thời gian)};
+%     \node[dim] (d2) at (-2.55,1.35) {\texttt{dim\_event}\\ (sự kiện)};
+%     \node[dim] (d3) at (-3.55,0)    {\texttt{dim\_user}\\ (người dùng)};
+%     \node[dim] (d4) at (-2.55,-1.35){\texttt{dim\_device}\\ (thiết bị)};
+%     \node[dim] (d5) at (0,-1.95)    {\texttt{dim\_geo}\\ (địa lý)};
+%     \node[dim] (d6) at (2.55,-1.35) {\texttt{dim\_page}\\ (trang)};
+%     \node[dim] (d7) at (3.55,0)     {\texttt{dim\_product}\\ (sản phẩm)};
+%     \node[dim] (d8) at (2.55,1.35)  {\texttt{dim\_traffic\_source}\\ (nguồn truy cập)};
 
-    \foreach \d in {d1,...,d8}{
-      \draw[line] (\d) -- (fct);
-    }
-  \end{tikzpicture}
+%     \foreach \d in {d1,...,d8}{
+%       \draw[line] (\d) -- (fct);
+%     }
+%   \end{tikzpicture}
 
-  \vspace{0.15cm}
-  \begin{flushleft}
-    \scriptsize
-    \textbf{dbt} xây dựng mô hình sao trong BigQuery; từ các bảng
-    fact / dimension tạo bảng tổng hợp
-    \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts},
-    \texttt{fct\_product\_performance} phục vụ tính KPI và
-    dashboard.
-  \end{flushleft}
-\end{frame}
+%   \vspace{0.15cm}
+%   \begin{flushleft}
+%     \scriptsize
+%     \textbf{dbt} xây dựng mô hình sao trong BigQuery; từ các bảng
+%     fact / dimension tạo bảng tổng hợp
+%     \texttt{fct\_daily\_ecommerce}, \texttt{fct\_event\_counts},
+%     \texttt{fct\_product\_performance} phục vụ tính KPI và
+%     dashboard.
+%   \end{flushleft}
+% \end{frame}
 
-\begin{frame}{Hệ thống chỉ số (KPI)}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.32\textwidth}
-    \begin{block}{A. Lưu lượng \& tương tác}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.15em}
-        \item Số người dùng, số phiên
-        \item Số phiên / người dùng
-        \item Số lượt xem trang
-        \item Tỷ lệ phiên có tương tác
-        \item Tỷ lệ người dùng mới
-      \end{itemize}
-    \end{block}
-    \column{0.32\textwidth}
-    \begin{block}{B. Phễu \& hành vi mua}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.15em}
-        \item Xem sản phẩm $\rightarrow$ thêm giỏ
-        \item Thêm giỏ $\rightarrow$ thanh toán
-        \item Thanh toán $\rightarrow$ mua hàng
-        \item Tỷ lệ rời bỏ giỏ hàng
-        \item Tỷ lệ chuyển đổi từng bước phễu
-      \end{itemize}
-    \end{block}
-    \column{0.32\textwidth}
-    \begin{block}{C. Chuyển đổi \& doanh thu}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.15em}
-        \item Số đơn hàng, doanh thu
-        \item Tỷ lệ chuyển đổi (theo phiên)
-        \item Giá trị đơn trung bình (AOV)
-        \item Doanh thu / phiên, / người dùng
-        \item Tỷ trọng doanh thu theo kênh
-      \end{itemize}
-    \end{block}
-  \end{columns}
-  \vspace{0.25cm}
-  \begin{block}{Nguyên tắc}
-    \scriptsize
-    Mỗi KPI được \textbf{định nghĩa một lần} (công thức, đơn vị,
-    mức tổng hợp) và dùng chung cho mọi báo cáo; chuyển đổi
-    (\texttt{purchase}) được phân bổ theo \textbf{nguồn của phiên}
-    $\rightarrow$ so sánh kênh đồng nhất.
-  \end{block}
-\end{frame}
+% \begin{frame}{Hệ thống chỉ số (KPI)}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.32\textwidth}
+%     \begin{block}{A. Lưu lượng \& tương tác}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.15em}
+%         \item Số người dùng, số phiên
+%         \item Số phiên / người dùng
+%         \item Số lượt xem trang
+%         \item Tỷ lệ phiên có tương tác
+%         \item Tỷ lệ người dùng mới
+%       \end{itemize}
+%     \end{block}
+%     \column{0.32\textwidth}
+%     \begin{block}{B. Phễu \& hành vi mua}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.15em}
+%         \item Xem sản phẩm $\rightarrow$ thêm giỏ
+%         \item Thêm giỏ $\rightarrow$ thanh toán
+%         \item Thanh toán $\rightarrow$ mua hàng
+%         \item Tỷ lệ rời bỏ giỏ hàng
+%         \item Tỷ lệ chuyển đổi từng bước phễu
+%       \end{itemize}
+%     \end{block}
+%     \column{0.32\textwidth}
+%     \begin{block}{C. Chuyển đổi \& doanh thu}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.15em}
+%         \item Số đơn hàng, doanh thu
+%         \item Tỷ lệ chuyển đổi (theo phiên)
+%         \item Giá trị đơn trung bình (AOV)
+%         \item Doanh thu / phiên, / người dùng
+%         \item Tỷ trọng doanh thu theo kênh
+%       \end{itemize}
+%     \end{block}
+%   \end{columns}
+%   \vspace{0.25cm}
+%   \begin{block}{Nguyên tắc}
+%     \scriptsize
+%     Mỗi KPI được \textbf{định nghĩa một lần} (công thức, đơn vị,
+%     mức tổng hợp) và dùng chung cho mọi báo cáo; chuyển đổi
+%     (\texttt{purchase}) được phân bổ theo \textbf{nguồn của phiên}
+%     $\rightarrow$ so sánh kênh đồng nhất.
+%   \end{block}
+% \end{frame}
 
-\begin{frame}{Chức năng hỗ trợ ra quyết định}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.48\textwidth}
-    \begin{block}{Phân tích}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item \textbf{Tổng quan điều hành:} KPI chính, xu hướng
-          ngày / tuần / tháng, so sánh với kỳ trước
-        \item \textbf{Bộ lọc đa chiều:} thời gian, kênh, chiến dịch,
-          thiết bị, vùng, nhóm sản phẩm
-        \item \textbf{So sánh hiệu suất:} kênh / chiến dịch trên
-          cùng bộ chỉ số, xếp hạng
-        \item \textbf{Phân tích phễu:} bước rời bỏ cao nhất, chia
-          theo kênh / thiết bị / sản phẩm
-        \item \textbf{Drill-down \& phân khúc:} kênh
-          $\rightarrow$ chiến dịch, tháng $\rightarrow$ ngày,
-          nhóm $\rightarrow$ sản phẩm; theo thiết bị, vùng, hành vi
-      \end{itemize}
-    \end{block}
-    \column{0.48\textwidth}
-    \begin{block}{Hỗ trợ quyết định}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item \textbf{Cảnh báo theo ngưỡng:} chỉ số bất thường so
-          với kỳ trước (ngưỡng do người dùng cấu hình)
-        \item \textbf{Mô phỏng kịch bản:} điều chỉnh lưu lượng /
-          tỷ lệ chuyển đổi $\rightarrow$ ước tính đơn hàng, doanh thu
-        \item \textbf{Truy vết số liệu:} từ con số trên dashboard
-          xem được công thức và bản ghi nguồn
-        \item \textbf{Phân tích chất lượng kênh:} phân biệt kênh
-          ``nhiều truy cập nhưng ít đơn'' với kênh ``ít truy cập
-          nhưng chuyển đổi tốt''
-        \vspace{0.75cm}
-      \end{itemize}
-    \end{block}
-  \end{columns}
-  \vspace{0.2cm}
-  \begin{flushleft}
-    \scriptsize
-    \textbf{Ánh xạ người dùng:} CMO -- tổng quan, so sánh, ưu tiên
-    nguồn lực $\bullet$ Digital Marketing Manager -- cảnh báo, chất
-    lượng kênh $\bullet$ E-commerce \& Content Specialist -- phễu,
-    drill-down.
-  \end{flushleft}
-\end{frame}
+% \begin{frame}{Chức năng hỗ trợ ra quyết định}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.48\textwidth}
+%     \begin{block}{Phân tích}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item \textbf{Tổng quan điều hành:} KPI chính, xu hướng
+%           ngày / tuần / tháng, so sánh với kỳ trước
+%         \item \textbf{Bộ lọc đa chiều:} thời gian, kênh, chiến dịch,
+%           thiết bị, vùng, nhóm sản phẩm
+%         \item \textbf{So sánh hiệu suất:} kênh / chiến dịch trên
+%           cùng bộ chỉ số, xếp hạng
+%         \item \textbf{Phân tích phễu:} bước rời bỏ cao nhất, chia
+%           theo kênh / thiết bị / sản phẩm
+%         \item \textbf{Drill-down \& phân khúc:} kênh
+%           $\rightarrow$ chiến dịch, tháng $\rightarrow$ ngày,
+%           nhóm $\rightarrow$ sản phẩm; theo thiết bị, vùng, hành vi
+%       \end{itemize}
+%     \end{block}
+%     \column{0.48\textwidth}
+%     \begin{block}{Hỗ trợ quyết định}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item \textbf{Cảnh báo theo ngưỡng:} chỉ số bất thường so
+%           với kỳ trước (ngưỡng do người dùng cấu hình)
+%         \item \textbf{Mô phỏng kịch bản:} điều chỉnh lưu lượng /
+%           tỷ lệ chuyển đổi $\rightarrow$ ước tính đơn hàng, doanh thu
+%         \item \textbf{Truy vết số liệu:} từ con số trên dashboard
+%           xem được công thức và bản ghi nguồn
+%         \item \textbf{Phân tích chất lượng kênh:} phân biệt kênh
+%           ``nhiều truy cập nhưng ít đơn'' với kênh ``ít truy cập
+%           nhưng chuyển đổi tốt''
+%         \vspace{0.75cm}
+%       \end{itemize}
+%     \end{block}
+%   \end{columns}
+%   \vspace{0.2cm}
+%   \begin{flushleft}
+%     \scriptsize
+%     \textbf{Ánh xạ người dùng:} CMO -- tổng quan, so sánh, ưu tiên
+%     nguồn lực $\bullet$ Digital Marketing Manager -- cảnh báo, chất
+%     lượng kênh $\bullet$ E-commerce \& Content Specialist -- phễu,
+%     drill-down.
+%   \end{flushleft}
+% \end{frame}
 
-%---------------------------------------------------------
-\section{Kế hoạch thực hiện}
-%---------------------------------------------------------
+% %---------------------------------------------------------
+% \section{Kế hoạch thực hiện}
+% %---------------------------------------------------------
 
-\begin{frame}{Kế hoạch thực hiện -- 6 giai đoạn, 7 mốc}
-  \centering
-  \begin{tikzpicture}[font=\tiny, >=stealth]
-    % ===== Vạch thời gian (ngày 0 = 25/10/2026, tổng 50 ngày) =====
-    % 1 ngày = 0.188 cm
-    \foreach \x in {0, 2.256, 3.948, 5.264, 6.58, 7.896, 9.212}{
-      \draw[gray!40] (\x, 0.25) -- (\x, -3.55);
-    }
+% \begin{frame}{Kế hoạch thực hiện -- 6 giai đoạn, 7 mốc}
+%   \centering
+%   \begin{tikzpicture}[font=\tiny, >=stealth]
+%     % ===== Vạch thời gian (ngày 0 = 25/10/2026, tổng 50 ngày) =====
+%     % 1 ngày = 0.188 cm
+%     \foreach \x in {0, 2.256, 3.948, 5.264, 6.58, 7.896, 9.212}{
+%       \draw[gray!40] (\x, 0.25) -- (\x, -3.55);
+%     }
 
-    % ===== Nhãn giai đoạn =====
-    \node[anchor=east, align=right, text width=3.1cm] at (-0.15, 0)     {G1: Thiết kế chi tiết + giữa kỳ};
-    \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -0.52) {G2: Trích xuất, ETL, nạp kho};
-    \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -1.04){G3: Xây dựng tầng KPI};
-    \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -1.56){G4: Dashboard bản cơ bản};
-    \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -2.08){G5: Dashboard hoàn chỉnh + đánh giá};
-    \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -2.60){G6: Báo cáo, video demo, nộp};
+%     % ===== Nhãn giai đoạn =====
+%     \node[anchor=east, align=right, text width=3.1cm] at (-0.15, 0)     {G1: Thiết kế chi tiết + giữa kỳ};
+%     \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -0.52) {G2: Trích xuất, ETL, nạp kho};
+%     \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -1.04){G3: Xây dựng tầng KPI};
+%     \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -1.56){G4: Dashboard bản cơ bản};
+%     \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -2.08){G5: Dashboard hoàn chỉnh + đánh giá};
+%     \node[anchor=east, align=right, text width=3.1cm] at (-0.15, -2.60){G6: Báo cáo, video demo, nộp};
 
-    % ===== Thanh giai đoạn =====
-    \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (0,     -0.20) rectangle (2.256, 0.20);
-    \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (2.444, -0.72) rectangle (3.948, -0.32);
-    \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (4.136, -1.24) rectangle (5.264, -0.84);
-    \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (5.452, -1.76) rectangle (6.58,  -1.36);
-    \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (6.768, -2.28) rectangle (7.896, -1.88);
-    \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (8.084, -2.80) rectangle (9.212, -2.40);
+%     % ===== Thanh giai đoạn =====
+%     \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (0,     -0.20) rectangle (2.256, 0.20);
+%     \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (2.444, -0.72) rectangle (3.948, -0.32);
+%     \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (4.136, -1.24) rectangle (5.264, -0.84);
+%     \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (5.452, -1.76) rectangle (6.58,  -1.36);
+%     \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (6.768, -2.28) rectangle (7.896, -1.88);
+%     \draw[draw=BKTemplate, fill=BKTemplate!25, rounded corners=1.5pt] (8.084, -2.80) rectangle (9.212, -2.40);
 
-    % ===== Mốc kiểm soát =====
-    \foreach \x/\m in {0.94/M1, 2.256/M2, 3.948/M3, 5.264/M4, 6.58/M5, 7.896/M6, 9.212/M7}{
-      \node[font=\tiny\bfseries] at (\x, -3.02) {\m};
-      \node[diamond, draw=red!70!black, fill=red!20, inner sep=1pt] at (\x, -3.3) {};
-    }
+%     % ===== Mốc kiểm soát =====
+%     \foreach \x/\m in {0.94/M1, 2.256/M2, 3.948/M3, 5.264/M4, 6.58/M5, 7.896/M6, 9.212/M7}{
+%       \node[font=\tiny\bfseries] at (\x, -3.02) {\m};
+%       \node[diamond, draw=red!70!black, fill=red!20, inner sep=1pt] at (\x, -3.3) {};
+%     }
 
-    % ===== Trục thời gian =====
-    \draw[->] (0, -3.75) -- (9.6, -3.75);
-    \foreach \x/\d in {0/25.10, 2.256/06.11, 3.948/15.11, 5.264/22.11, 6.58/29.11, 7.896/06.12, 9.212/13.12}{
-      \draw (\x, -3.75) -- (\x, -3.68);
-      \node at (\x, -3.98) {\d};
-    }
-  \end{tikzpicture}
+%     % ===== Trục thời gian =====
+%     \draw[->] (0, -3.75) -- (9.6, -3.75);
+%     \foreach \x/\d in {0/25.10, 2.256/06.11, 3.948/15.11, 5.264/22.11, 6.58/29.11, 7.896/06.12, 9.212/13.12}{
+%       \draw (\x, -3.75) -- (\x, -3.68);
+%       \node at (\x, -3.98) {\d};
+%     }
+%   \end{tikzpicture}
 
-  \vspace{0.15cm}
-  \begin{flushleft}
-    \scriptsize
-    \textbf{Mốc:} M1 nộp slide (30/10) $\bullet$ M2 thuyết trình giữa kỳ (06/11)
-    $\bullet$ M3 kho hoàn chỉnh (15/11) $\bullet$ M4 KPI kiểm thử (22/11)
-    $\bullet$ M5 dashboard v1 (29/11) $\bullet$ M6 hoàn chỉnh + đánh giá (06/12)
-    $\bullet$ M7 nộp cuối kỳ (13/12).\\
-    Chuyển giai đoạn khi \textbf{đạt tiêu chí nghiệm thu} của mốc
-    tương ứng; góp ý giữa kỳ được dùng điều chỉnh thiết kế trước
-    khi nạp dữ liệu hàng loạt.
-  \end{flushleft}
-\end{frame}
+%   \vspace{0.15cm}
+%   \begin{flushleft}
+%     \scriptsize
+%     \textbf{Mốc:} M1 nộp slide (30/10) $\bullet$ M2 thuyết trình giữa kỳ (06/11)
+%     $\bullet$ M3 kho hoàn chỉnh (15/11) $\bullet$ M4 KPI kiểm thử (22/11)
+%     $\bullet$ M5 dashboard v1 (29/11) $\bullet$ M6 hoàn chỉnh + đánh giá (06/12)
+%     $\bullet$ M7 nộp cuối kỳ (13/12).\\
+%     Chuyển giai đoạn khi \textbf{đạt tiêu chí nghiệm thu} của mốc
+%     tương ứng; góp ý giữa kỳ được dùng điều chỉnh thiết kế trước
+%     khi nạp dữ liệu hàng loạt.
+%   \end{flushleft}
+% \end{frame}
 
-%---------------------------------------------------------
-\section{Thông tin bổ sung}
-%---------------------------------------------------------
+% %---------------------------------------------------------
+% \section{Thông tin bổ sung}
+% %---------------------------------------------------------
 
-\begin{frame}{Phạm vi, giới hạn và hướng mở rộng}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.31\textwidth}
-    \begin{block}{Phạm vi}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item Xử lý \textbf{batch} trên 92 ngày dữ liệu
-        \item Chưa thu thập thời gian thực
-        \item Chưa kết nối API nền tảng quảng cáo
-        \vspace{1.5cm}
-      \end{itemize}
-    \end{block}
-    \column{0.32\textwidth}
-    \begin{block}{Giới hạn}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item Không có chi phí $\rightarrow$ chưa đánh giá CPA, ROAS
-        \item Dữ liệu làm mờ $\rightarrow$ một số kết quả có thể lệch
-        % \item 3 tháng (mùa mua sắm) $\rightarrow$ diễn giải mùa vụ thận trọng
-        \item Mô phỏng dựa trên hiệu suất lịch sử
-        \vspace{0.9cm}
-      \end{itemize}
-    \end{block}
-    \column{0.31\textwidth}
-    \begin{block}{Mở rộng}
-      \scriptsize
-      \begin{itemize}
-          \setlength{\itemsep}{0.2em}
-        \item Thêm \textbf{bảng chi phí} theo cùng chiều thời gian /
-          kênh $\rightarrow$ tính thêm CPA, ROAS mà \textbf{không đổi
-          kiến trúc}
-        \item Thêm nguồn Google / Meta / TikTok Ads, email marketing
-        \vspace{1cm}
-      \end{itemize}
-    \end{block}
-  \end{columns}
-  \vspace{0.25cm}
-  \begin{block}{Lợi ích kỳ vọng}
-    \scriptsize
-    Giảm tổng hợp báo cáo thủ công $\bullet$ truy vết số liệu đến
-    dữ liệu gốc $\bullet$ phát hiện sớm chiến dịch bất thường
-    $\bullet$ so sánh kênh nhất quán $\rightarrow$ ra quyết định
-    dựa trên dữ liệu.
-  \end{block}
-\end{frame}
+% \begin{frame}{Phạm vi, giới hạn và hướng mở rộng}
+%   \small
+%   \begin{columns}[T,onlytextwidth]
+%     \column{0.31\textwidth}
+%     \begin{block}{Phạm vi}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item Xử lý \textbf{batch} trên 92 ngày dữ liệu
+%         \item Chưa thu thập thời gian thực
+%         \item Chưa kết nối API nền tảng quảng cáo
+%         \vspace{1.5cm}
+%       \end{itemize}
+%     \end{block}
+%     \column{0.32\textwidth}
+%     \begin{block}{Giới hạn}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item Không có chi phí $\rightarrow$ chưa đánh giá CPA, ROAS
+%         \item Dữ liệu làm mờ $\rightarrow$ một số kết quả có thể lệch
+%         % \item 3 tháng (mùa mua sắm) $\rightarrow$ diễn giải mùa vụ thận trọng
+%         \item Mô phỏng dựa trên hiệu suất lịch sử
+%         \vspace{0.9cm}
+%       \end{itemize}
+%     \end{block}
+%     \column{0.31\textwidth}
+%     \begin{block}{Mở rộng}
+%       \scriptsize
+%       \begin{itemize}
+%           \setlength{\itemsep}{0.2em}
+%         \item Thêm \textbf{bảng chi phí} theo cùng chiều thời gian /
+%           kênh $\rightarrow$ tính thêm CPA, ROAS mà \textbf{không đổi
+%           kiến trúc}
+%         \item Thêm nguồn Google / Meta / TikTok Ads, email marketing
+%         \vspace{1cm}
+%       \end{itemize}
+%     \end{block}
+%   \end{columns}
+%   \vspace{0.25cm}
+%   \begin{block}{Lợi ích kỳ vọng}
+%     \scriptsize
+%     Giảm tổng hợp báo cáo thủ công $\bullet$ truy vết số liệu đến
+%     dữ liệu gốc $\bullet$ phát hiện sớm chiến dịch bất thường
+%     $\bullet$ so sánh kênh nhất quán $\rightarrow$ ra quyết định
+%     dựa trên dữ liệu.
+%   \end{block}
+% \end{frame}
 
 \setbeamertemplate{footline}{}
 \begin{frame}
@@ -665,7 +665,7 @@
   \vspace{15pt}
   Acknowledgements:\\
   We would like to express our sincere gratitude to our supervisor,\\
-  Ms. Võ Thị Ngọc Châu \\
+  Assoc. Prof. Dr. Võ Thị Ngọc Châu \\
 \end{frame}
 
 \end{document}
