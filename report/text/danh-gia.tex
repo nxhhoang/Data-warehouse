@@ -3,17 +3,19 @@
 
 \subsection{Phương pháp kiểm tra}
 
-Đánh giá được thực hiện trên ba lớp: kiểm thử code local, replay dữ liệu công khai trên một ngày Sandbox, và lặp lại replay trong Docker/WSL. Kiểm thử dùng các đầu ra cụ thể thay vì chỉ kiểm tra service có khởi động được hay không.
+Đánh giá kết hợp kiểm thử cục bộ với replay dữ liệu công khai trên BigQuery Sandbox. Luồng emulator native được kiểm tra bằng fixture nhỏ. Luồng replay lớn dùng bounded replay: collector nhận message từ subscription cục bộ và ghi ra snapshot trước khi DirectRunner xử lý. Cách này cho phép kiểm tra toàn bộ 56.742 event của ngày 18/12/2020, thay vì suy ra rằng publisher đã gửi xong thì mọi dữ liệu cũng đã được xử lý xong. \medskip
 
-\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
-\caption{Kết quả kiểm chứng của implementation}
+Ngày thử nghiệm được chọn để có người dùng, mặt hàng và giao dịch thật. Không có việc lọc riêng các event mua hàng để tăng số liệu. Toàn bộ 56.742 event trong ngày được phát lại, rồi tách riêng event hợp lệ, event bị loại theo quality rule và dead-letter trước khi nạp kho.
+
+\begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}X}
+\caption{Kết quả kiểm chứng trên fixture và một ngày dữ liệu công khai}
 \label{tab:evaluation-results} \\
 \hline
-\textbf{Kiểm chứng} & \textbf{Kết quả quan sát được} \\
+\textbf{Tầng kiểm chứng} & \textbf{Kết quả quan sát được} \\
 \hline
 \endfirsthead
 \hline
-\textbf{Kiểm chứng} & \textbf{Kết quả quan sát được} \\
+\textbf{Tầng kiểm chứng} & \textbf{Kết quả quan sát được} \\
 \hline
 \endhead
 \hline
@@ -21,40 +23,46 @@
 \hline
 \endlastfoot
 
-Unit test và simulation
-& 153 test Pytest pass. Fixture 9 dòng được định tuyến thành 4 valid, 2 dead-letter và 4 quality rows; cũng xuất được CSV quality log. \\
+Unit test và workflow
+& 183 test Pytest pass. Fixture 9 dòng tạo đúng 4 valid event, 2 dead-letter và 4 quality-log row. Test cũng bao phủ công thức KPI, guard ghi đè, bounded collector và xuất CSV. Workflow thu nhận toàn bộ test bằng \texttt{pytest tests/ -v}. \\
 
-Replay dữ liệu công khai
-& 100/100 event được publish từ ngày 01/11/2020 qua emulator và DirectRunner, ghi thành 100 dòng JSONL hợp lệ. \\
+Replay đầy đủ
+& Publisher nhận thành công 56.742/56.742 event, không có event nào bị đẩy sang DLQ. Collector thu 887 message và ghi đủ snapshot. Sau DirectRunner, có 56.741 event hợp lệ, 1 event bị loại vì thiếu transaction ID và 0 dead-letter. Cổng đối soát xác nhận $56.742 = 56.741 + 1 + 0$ trước khi nạp raw. \\
 
 Kho trên Sandbox
-& \texttt{events\_20201101} chứa 100 event. dbt tạo 19/19 model và pass 5/5 test. \texttt{fct\_events}=100, \texttt{fct\_sessions}=17; ba KPI view có thể query và mỗi view trả 11 dòng. \\
+& 19/19 model và 5/5 dbt test pass. \texttt{fct\_events}=56.741, \texttt{fct\_sessions}=4.843, \texttt{fct\_item\_events}=74.655, \texttt{fct\_purchase\_items}=310, \texttt{dim\_product}=694, \texttt{dim\_user}=4.262. Ba KPI view đều query được, mỗi view trả 47 dòng. \\
 
-Dashboard thực tế
-& Streamlit đọc được phiên/SKU từ BigQuery thật và render 0 exception. Health endpoint và trang chính trả HTTP 200. \\
+Giao dịch và item
+& Nguồn có 107 event purchase; sau filter/dedup, warehouse ghi nhận 105 giao dịch hợp lệ. Số dòng item nguồn và fact đều là 310 trên những giao dịch đó. Kiểm tra source-item \(\rightarrow\) fact-item cho kết quả 0 lỗi về số dòng item và doanh thu; doanh thu item hai phía đều là 6.584 USD. \\
 
-Docker offline
-& 4 valid event, 2 dead-letter, 4 quality rows từ fixture. Emulator và pipeline được dừng, container được xóa. \\
+Dashboard
+& AppTest dùng BigQuery thật, render trang \textit{Tổng quan điều hành}, có 9 liên kết trang và không có exception. Health endpoint và trang chính đều trả HTTP 200. Dashboard chạy trong giới hạn 1 GiB và 1 CPU; lúc đo dùng 86.77 MiB. \\
 
-Docker Sandbox
-& 100 event được load vào dataset riêng \texttt{marketing\_dss\_docker\_smoke}. Kết quả được 19/19 model, 5/5 dbt test và ba KPI view, với \texttt{fct\_events}=100 và \texttt{fct\_sessions}=17. \\
+CSV cho Looker Studio
+& Ba file CSV xuất từ \texttt{v\_kpi\_traffic\_engagement}, \texttt{v\_kpi\_funnel} và \texttt{v\_kpi\_conversion\_revenue}, mỗi file 47 dòng cho ngày 18/12/2020. Export dùng giới hạn query bytes và 10.000 dòng/view, rồi kiểm tra ngày và schema trước khi ghi. \\
 
-Benchmark giới hạn
-& Query raw đọc 7.68 MiB trong 1.636 giây; bốn query KPI lần lượt tốn 0.787, 0.787, 0.827 và 0.857 giây. Trình chạy tắt query cache ở query thật để đo latency. \\
+Benchmark bounded
+& Raw scan 14,59 MiB trong 1,576 giây. Bốn truy vấn KPI/mart lần lượt tốn 0,777; 0,863; 0,816 và 0,822 giây, đều dưới 3 giây. Query thật tắt query cache và artifact được lưu tại \texttt{tests/benchmark\_results.json}. \\
 \end{xltabular}
 
-\subsection{Quota và tài nguyên}
+\subsection{Kiểm soát replay và tài nguyên}
 
-Quá trình phát lại (replay) 100 sự kiện đầy đủ từ nguồn dữ liệu trong ngày kiểm thử tiêu tốn 22.47 MiB trên BigQuery. Con số này lớn hơn kích thước thực tế của các thông điệp do truy vấn cần quét toàn bộ các trường hợp lệ để dựng bản ghi JSON. Biến cấu hình \texttt{BQ\_MAX\_QUERY\_BYTES=134217728} giới hạn dung lượng quét của mỗi truy vấn ở mức tối đa 128 MiB: cả publisher và dashboard đều chạy kiểm tra trước (dry-run) lẫn áp trần khi thực thi, trong khi dbt cũng được cấu hình ngưỡng giới hạn tương tự trong profile. Ngoài ra, số liệu sử dụng hằng tháng được trích xuất trực tiếp từ \texttt{INFORMATION\_SCHEMA.JOBS\_BY\_PROJECT} thay vì chỉ ước tính qua tệp nhật ký nội bộ. \medskip
+Replay lớn giữ nguyên toàn bộ 56.742 event trong ngày thử, với \texttt{PUBLISH\_RATE\_PER\_SEC}=500. Mỗi message chở tối đa 64 raw payload gốc để giảm overhead của emulator. Việc gói payload như vậy chỉ tối ưu giao vận giữa publisher và subscription; DirectRunner vẫn đọc, chuẩn hóa và kiểm tra từng event riêng. Collector chỉ gửi acknowledgment sau khi snapshot đã được ghi và đồng bộ xuống đĩa. Nhờ đó, quy trình có hai lớp kiểm chứng: đủ dữ liệu từ broker và đủ dữ liệu sau biến đổi trước khi nạp raw. \medskip
 
-Tính đến thời điểm kết thúc đợt kiểm thử, toàn bộ dự án đã xử lý tổng cộng \textbf{103,485,196 bytes} (khoảng 103.49 MB), tương đương 0.19\% hạn mức ngân sách 50 GiB tự đặt. Lưu ý rằng nhật ký lịch sử job của hệ thống có thể cập nhật trễ và số liệu này chỉ mang tính theo dõi chứ không phải hóa đơn thanh toán thực tế. Việc thiết lập trần ngân sách đóng vai trò như một chốt chặn để rà soát trước khi mở rộng quy mô dữ liệu, chứ không bảo đảm mọi truy vấn trong tương lai đều tiêu tốn ít tài nguyên. \medskip
+Trong bounded replay, emulator do script tạo được dừng sau khi collector hoàn tất, giúp giải phóng bộ nhớ của Java broker trước khi DirectRunner chạy. Giá trị RAM lớn nhất ghi nhận được của pipeline là 1.814 MiB, dưới mức giới hạn 2 GiB của replay container. Emulator ở mức 447 MiB và publisher ở mức 208 MiB theo các mẫu đo của watchdog. Dung lượng trống trên ổ chứa workspace còn khoảng 25,2 GB khi kết thúc kiểm thử. Các tiến trình được dừng theo PID và token đã đăng ký, thay vì tìm và dừng process theo tên nhận diện chung. \medskip
 
-Khi chạy kiểm thử replay trên môi trường Docker, mức tiêu thụ RAM ghi nhận được lần lượt là khoảng 211 MiB đối với emulator, 212 MiB cho pipeline và 86.49 MiB cho dashboard. Tiến trình watchdog giám sát liên tục mức sử dụng RAM, dung lượng ổ đĩa và các PID; khi kết thúc, các tiến trình con trên Windows được thu hồi theo cây tiến trình, còn trên Linux sử dụng cơ chế process group cho emulator. Sau khi hoàn tất phiên kiểm thử, hệ thống đã dọn dẹp sạch tài nguyên, không còn tiến trình nào chiếm dụng cổng 8085 hay 8501 cũng như không còn container Compose tồn đọng.
+Ở phần trích xuất nguồn, dry-run và job thực tế đều xử lý khoảng 51,87 MiB, dưới mức \texttt{maximum\_bytes\_billed}=128 MiB cho từng truy vấn. Query-size guard cũng được dùng trong dbt profile và các client đọc BigQuery cho dashboard, CSV export và benchmark. Số liệu cuối từ \texttt{INFORMATION\_SCHEMA.JOBS\_BY\_PROJECT} ghi nhận \textbf{1.767.069.984 bytes đã xử lý trong project}, tức 1,6457 GiB. Con số này bằng 3,29\% ngân sách tự đặt 50 GiB; phần miễn phí còn lại được ước tính khoảng 1.022,35 GiB. Đây là metadata theo dõi usage, không phải hóa đơn; lịch sử job có thể cập nhật trễ, và ngưỡng 50 GiB không phải cap cứng của Google Cloud. \medskip
+
+Không có tài khoản billing nào được bật trong thử nghiệm này. Quyền truy cập BigQuery Sandbox sử dụng ADC người dùng, không cần service-account JSON key, Cloud Pub/Sub, Dataflow managed hoặc GCS. Tuy nhiên, kết quả trên chỉ xác nhận một replay có giới hạn trong ngày; nó không chứng minh quota hay hiệu năng cho toàn bộ 92 ngày dữ liệu.
 
 \subsection{Những giới hạn của đánh giá}
 
-Thứ nhất, dù tập dữ liệu nguồn GA4 kéo dài 92 ngày, kịch bản kiểm thử replay mới chỉ chạy trên 100 sự kiện đầu tiên của một ngày. Kết quả này chưa đủ cơ sở để đánh giá hiệu năng hay mức tiêu thụ quota khi xử lý toàn bộ 92 ngày dữ liệu. Bên cạnh đó, các thông số độ trễ nêu trên được đo tuần tự trên tập mẫu nhỏ nên không thể xem là cam kết hiệu năng cho các tập dữ liệu quy mô lớn. \medskip
+Trước hết, kết quả này áp dụng cho toàn bộ 56.742 event của \textbf{một ngày} (18/12/2020), không phải toàn bộ 92 ngày trong nguồn công khai. Kích thước batch đủ lớn để kiểm chứng event, phiên, user, item và doanh thu thật, nhưng chưa phải kiểm chứng hiệu năng toàn kỳ hoặc một luồng production liên tục. Các độ trễ trên cũng đo trên cùng ngày dữ liệu và môi trường thử cụ thể nên không nên xem là SLA cho một batch lớn hơn nữa. \medskip
 
-Thứ hai, lô dữ liệu thử nghiệm không phát sinh sự kiện mua hàng hay dữ liệu mặt hàng. Vì vậy, đợt kiểm chứng này chủ yếu xác nhận tính đúng đắn của luồng thu thập, chuẩn hóa lược đồ và gom nhóm phiên. Dù các quy tắc xử lý giao dịch và sản phẩm vẫn được kiểm tra qua bộ dữ liệu giả lập (fixture) cục bộ, hệ thống chưa ghi nhận được giao dịch có doanh thu thực tế có giá trị dương trên môi trường Sandbox. Để các chỉ số KPI doanh thu mang lại giá trị phân tích thực tiễn, cần mở rộng quy mô lô dữ liệu thử nghiệm đi kèm bước ước tính chi phí quét (dry-run) và cấp phát quota riêng. \medskip
+Về người dùng và doanh thu, nguồn có 4.261 \texttt{user\_pseudo\_id} phân biệt. \texttt{dim\_user} có 4.262 dòng vì bao gồm bản ghi Unknown dự phòng, nên số dòng dimension không thể thay thế tổng distinct user khi trình bày KPI. Người dùng và doanh thu trên user cũng phải được tính ở phạm vi lọc hiện tại, không lấy tổng các giá trị \texttt{users}/\texttt{revenue\_per\_user} qua nhiều kênh, nơi cùng một người có thể xuất hiện nhiều lần. \medskip
 
-Cuối cùng, DirectRunner và Pub/Sub Emulator vốn chỉ phục vụ mục đích kiểm thử trên máy cục bộ, nên không phản ánh được khả năng lưu trữ bền vững, cơ chế phân quyền IAM hay hiệu năng thực tế của các dịch vụ phân tán trên đám mây. Tương tự, tệp xuất CSV cho Looker Studio chỉ là bản chụp dữ liệu tĩnh (snapshot) phục vụ minh họa, chưa phải kết nối trực tiếp (live) tới BigQuery. Các phương án nâng cấp hạ tầng và kết nối dữ liệu tự động này được tách riêng sang phần hướng mở rộng thay vì tính vào phạm vi đã hoàn thiện. \medskip
+Doanh thu cấp đơn và item cần được đọc tách biệt. Tổng \texttt{purchase\_revenue\_in\_usd} là 6.591 USD, trong khi tổng item revenue là 6.584 USD. Dữ liệu GA4 được làm mờ ở những trường này nên hai giá trị không cần trùng khớp chính xác. Do đó, test kiểm tra lineage item từ nguồn tới fact, có đếm số dòng item và cho phép sai lệch tối đa 0,01 USD theo transaction, thay vì bắt tổng doanh thu đơn hàng phải bằng tổng giá trị item. Item revenue dùng nguồn dương khi có và fallback bằng \texttt{price\_usd $\times$ quantity} ở các trường hợp còn lại. Fallback này không phải bằng chứng giá item thực hay giá thành đối soát kế toán. \medskip
+
+Bounded replay cũng không thay thế một dịch vụ streaming có IAM, lưu trữ bền vững và quản lý phân phối snapshot toàn cục. Snapshot là tệp trung gian của một batch rõ ràng, giúp kiểm soát subscription và bộ nhớ cục bộ. Message ID được dùng để tránh ghi lại redelivery, còn khử trùng sự kiện tiếp tục được xử lý ở pipeline và dbt. Kết quả này không suy ra tính đúng đắn của Cloud Pub/Sub, Dataflow managed hoặc exactly-once delivery trong production. \medskip
+
+Cuối cùng, CSV đã được xuất đúng từ ba KPI view và giữ giá trị tính toán của kho. Chúng là snapshot để tải lên Looker Studio thủ công, không phải một BigQuery live connector tự cập nhật. Nhu cầu live connector, IAM, Billing Project, incremental load và replay nhiều ngày vẫn thuộc phần mở rộng, không nằm trong phạm vi được kiểm chứng ở đây. \medskip

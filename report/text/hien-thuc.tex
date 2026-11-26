@@ -54,7 +54,11 @@ Quá trình chạy thực hiện như sau:
   \item Ba KPI view giúp dashboard tiêu thụ cùng một định nghĩa số liệu. Streamlit có thể chạy cùng dữ liệu với Docker hoặc kết nối BigQuery từ máy phát triển.
 \end{enumerate}
 
-Việc ghi JSONL trung gian có mục đích rõ ràng: Sandbox không được dùng như một streaming insert endpoint cho luồng này. Batch load từ file vẫn cho phép kiểm tra toàn bộ đường đi của sự kiện mà không thêm một dịch vụ trung chuyển.
+Việc ghi JSONL trung gian có mục đích rõ ràng: Sandbox không được dùng như một streaming insert endpoint cho luồng này. Batch load từ file vẫn cho phép kiểm tra toàn bộ đường đi của sự kiện mà không thêm một dịch vụ trung chuyển. \medskip
+
+Replay có giới hạn (bounded replay) bổ sung một cổng kiểm tra hoàn tất cho batch đã biết trước số event. Collector đọc message từ subscription của emulator cục bộ, ghi snapshot rồi mới acknowledge từng nhóm message; những redelivery có cùng message ID không được ghi thêm. File này có thể chứa các batch wrapper, nhưng từng raw payload vẫn được decode và xử lý riêng như bình thường. Nếu đã thu đủ snapshot, emulator do script tạo sẽ được dừng để giải phóng RAM, rồi DirectRunner đọc snapshot có giới hạn thay vì đọc một stream không có điểm dừng rõ ràng. Nhánh streaming cho fixture nhỏ vẫn được giữ nguyên. Snapshot ACK chỉ khẳng định rằng dữ liệu đã được thu và ghi vào máy, không thay thế kiểm tra đúng KPI ở phần sau.
+
+Trước khi nạp raw, \texttt{verify\_replay\_output.py} đối chiếu số event từ \texttt{publisher\_stats.json} với tổng số event hợp lệ, dead-letter và event bị loại theo quality rule. Việc file không tăng dòng không được xem là bằng chứng replay đã hoàn tất. Nếu đối soát còn thiếu hoặc dư, script dừng trước bước load để tránh tạo warehouse từ một batch không đầy đủ. Các tham số replay giới hạn số event và đặt thời hạn cho publisher, collector và DirectRunner. Đồng thời, watchdog theo dõi RAM, disk cũng như PID của từng tiến trình đăng ký.
 
 \subsection{Cài đặt và chạy thủ công}
 
@@ -115,6 +119,8 @@ Dataset test mới giúp tránh ghi đè batch trước. Nếu dùng lại datas
 \subsection{Dữ liệu hiển thị và Looker Studio}
 
 Bản dashboard hiện thực là Streamlit. Người dùng có thể sử dụng để lọc thời gian, kênh, nguồn/medium, thiết bị, quốc gia và các chiều phân tích khác phù hợp từng trang. Các trang bao gồm tổng quan, so sánh hiệu suất, chất lượng kênh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Tab CMO/Manager/Specialist chỉ thay đổi nhóm trang hiển thị; nó không phải lớp phân quyền. \medskip
+
+Luồng hiển thị gồm hai nhánh từ cùng kho dữ liệu. BigQuery Core/Marts là đầu vào của dashboard Streamlit. Ba KPI view được dùng để xuất CSV rồi đưa vào Looker Studio, tạo thành nhánh trình bày báo cáo có thể cập nhật lại bằng một lần xuất CSV mới. \medskip
 
 Với nhu cầu trình bày bằng Looker Studio trong giới hạn không bật billing, có thể xuất các kết quả tổng hợp thành CSV từ BigQuery Console rồi tải file lên Looker Studio dưới dạng dữ liệu tệp tín. Các view gồm:
 
