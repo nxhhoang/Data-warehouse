@@ -18,6 +18,7 @@ PUBSUB_SUBSCRIPTION.
 """
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -217,6 +218,33 @@ def file_payloads(path: str):
             yield line
 
 
+def batched_payloads(payloads, batch_size: int):
+    """Group raw event strings into bounded batches for replay transport.
+
+    Each original payload remains an unchanged string inside its Python list.
+    This lets the optional batch decoder isolate malformed individual events.
+    """
+    if batch_size < 1:
+        raise ValueError("Replay batch size must be a positive integer")
+    batch = []
+    for payload in payloads:
+        batch.append(payload)
+        if len(batch) == batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def write_publish_stats(stats: dict, path):
+    """Write publisher counters used to verify that replay really finished."""
+    if path is None:
+        return
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
+
+
 def rate_per_second(total: int, started_at: float) -> float:
     """Return messages published per second since a monotonic start time."""
     elapsed = max(time.monotonic() - started_at, 1e-6)
@@ -224,7 +252,8 @@ def rate_per_second(total: int, started_at: float) -> float:
 
 
 def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
-                dlq_path: str, payloads, rate_limit_per_second: float = 0.0) -> dict:
+                dlq_path: str, payloads, rate_limit_per_second: float = 0.0,
+                batch_size: int = 1) -> dict:
     """Publish every payload, routing persistent failures to the dead-letter topic.
 
     Each message is retried up to MAX_PUBLISH_RETRIES times with exponential
@@ -241,7 +270,11 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
     payloads : Iterable[str]
         JSON strings produced by fetch_event_payloads.
     rate_limit_per_second : float, optional
-        Maximum scheduled publishing rate; 0 disables throttling.
+        Maximum scheduled publishing rate in events per second; 0 disables throttling.
+    batch_size : int, optional
+        Raw event payload strings per emulator message. The default of one
+        preserves the original single-event wire format. When larger than one,
+        records are carried as a JSON array of raw payload strings.
 
     Returns
     -------
@@ -253,7 +286,9 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
     stats = {"published": 0, "failed_to_dlq": 0, "total": 0}
     started_at = time.monotonic()
     last_beat = started_at
-    for payload in payloads:
+    for batch in batched_payloads(payloads, batch_size):
+        payload = batch[0] if batch_size == 1 else json.dumps(batch, ensure_ascii=False)
+        record_count = len(batch)
         if rate_limit_per_second > 0 and stats["total"] > 0:
             scheduled_time = started_at + stats["total"] / rate_limit_per_second
             time.sleep(max(0.0, scheduled_time - time.monotonic()))
@@ -262,14 +297,14 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
             elapsed = now - started_at
             print(f"[publish] heartbeat: {stats} at {rate_per_second(stats['total'], started_at):.1f} ev/s")
             last_beat = now
-        stats["total"] += 1
+        stats["total"] += record_count
         data = payload.encode("utf-8")
         published = False
         for attempt in range(1, MAX_PUBLISH_RETRIES + 1):
             try:
                 future = publisher.publish(topic_path, data)
                 future.result(timeout=60)
-                stats["published"] += 1
+                stats["published"] += record_count
                 published = True
                 break
             except (GoogleAPIError, TimeoutError) as err:
@@ -279,7 +314,7 @@ def publish_all(publisher: pubsub_v1.PublisherClient, topic_path: str,
             try:
                 future = publisher.publish(dlq_path, data)
                 future.result(timeout=60)
-                stats["failed_to_dlq"] += 1
+                stats["failed_to_dlq"] += record_count
             except (GoogleAPIError, TimeoutError) as err:
                 print(f"[dlq] could not publish to the dead-letter topic: {err}")
         if stats["total"] % 10000 == 0:
@@ -300,6 +335,10 @@ def main() -> int:
     parser.add_argument("--start-date", default=None, help="YYYYMMDD or YYYY-MM-DD")
     parser.add_argument("--end-date", default=None, help="YYYYMMDD or YYYY-MM-DD")
     parser.add_argument("--publish-rate-per-second", type=float, default=None)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="raw event payloads per emulator message (default: 1)")
+    parser.add_argument("--stats-file", type=Path, default=None,
+                        help="write event counters for replay completion validation")
     parser.add_argument("--max-query-mib", type=float, default=None,
                         help="fail dry runs above this estimate (default: 128 MiB)")
     parser.add_argument("--setup-only", action="store_true",
@@ -314,6 +353,11 @@ def main() -> int:
     topic_id = get_setting("PUBSUB_TOPIC", "ga4-events")
     dlq_topic_id = get_setting("PUBSUB_DLQ_TOPIC", "ga4-events-dlq")
     subscription_id = get_setting("PUBSUB_SUBSCRIPTION", f"{topic_id}-sub")
+    batch_size = args.batch_size if args.batch_size is not None else int(
+        get_setting("REPLAY_BATCH_SIZE", "1"))
+    if batch_size < 1:
+        print("Replay batch size must be a positive integer")
+        return 1
 
     publisher = pubsub_v1.PublisherClient()
     sub_path = setup_pubsub(
@@ -359,7 +403,8 @@ def main() -> int:
     if publish_rate is None:
         publish_rate = float(get_setting("PUBLISH_RATE_PER_SEC", "0"))
     stats = publish_all(publisher, topic_path, dlq_path, payloads,
-                        rate_limit_per_second=publish_rate)
+                        rate_limit_per_second=publish_rate, batch_size=batch_size)
+    write_publish_stats(stats, args.stats_file)
     print(f"[extract] finished: {stats}")
     return 0
 

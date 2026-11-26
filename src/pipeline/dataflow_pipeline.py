@@ -399,6 +399,19 @@ class DedupeEventsDoFn(beam.DoFn):
             })
 
 
+def split_batch_payload(payload):
+    """Yield unchanged raw event strings from a replay batch wire payload."""
+    raw = payload.decode("utf-8", errors="replace") if isinstance(payload, bytes) else payload
+    decoded = json.loads(raw)
+    if isinstance(decoded, str):
+        # A batch-size-n replay can end with a single remaining event.
+        yield decoded
+        return
+    if not isinstance(decoded, list) or not all(isinstance(item, str) for item in decoded):
+        raise ValueError("Batched replay input must be a JSON array of raw payload strings")
+    yield from decoded
+
+
 def build_pipeline(argv):
     """Construct the Beam pipeline from CLI arguments.
 
@@ -421,6 +434,8 @@ def build_pipeline(argv):
                         help="projects/<project>/subscriptions/<sub> (streaming mode)")
     parser.add_argument("--input_file", default=None,
                         help="JSONL file of events (local dry-run mode, replaces Pub/Sub)")
+    parser.add_argument("--json_batches", action="store_true",
+                        help="decode Pub/Sub messages as JSON arrays containing raw event strings")
     parser.add_argument("--output_dir", default=None,
                         help="write JSONL outputs here instead of BigQuery (dry-run mode)")
     parser.add_argument("--raw_dataset", default="marketing_dss_raw",
@@ -496,6 +511,9 @@ def build_pipeline(argv):
             messages = pipeline | "ReadPubSub" >> beam.io.ReadFromPubSub(
                 subscription=known_args.input_subscription
             )
+
+        if known_args.json_batches:
+            messages = messages | "UnpackReplayBatches" >> beam.FlatMap(split_batch_payload)
 
         parsed = messages | "ParseJson" >> beam.ParDo(ParseJsonDoFn()).with_outputs(
             ParseJsonDoFn.DEAD_TAG, main="valid"

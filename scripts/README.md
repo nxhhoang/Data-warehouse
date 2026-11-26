@@ -22,6 +22,10 @@ from the repository root.
 | `rebuild_warehouse.sh` | 3–4 — Transform + Warehouse | Recompile channels, rebuild all dbt models, run tests, deploy KPI views |
 | `compile_channel_macro.py` | 4 — Warehouse | Compile `config/channels.yaml` into the `map_channel` dbt macro |
 | `verify_dry_run.py` | 3 — Transform | Check dry-run outputs against the expected fixture routing |
+| `verify_replay_output.py` | 3 — Transform | Require publisher, valid, dead-letter and dropped-event accounting to match before raw loading |
+| `collect_broker_replay.py` | bounded replay | Pull a local bounded subscriber snapshot, flush it, and acknowledge messages with a deadline |
+| `export_kpi_csv.py` | 5 — Dashboard | Export bounded KPI-view CSV snapshots for manual Looker Studio upload |
+| `smoke_streamlit_sandbox.py` | 5 — Dashboard | Render Streamlit with real BigQuery data and check exceptions/navigation |
 | `export_quality_log.py` | quality | Export the quality log (BigQuery table or dry-run JSONL) to CSV |
 | `load_raw_to_bigquery.py` | 4 — Warehouse | Upload local pipeline JSONL outputs into BigQuery raw tables (no GCS) |
 
@@ -83,10 +87,54 @@ Consumers stop before the emulator so cleanup does not create RPC errors.
 
 ```bash
 bash scripts/run_emulator_replay.sh [--load] [--timeout 240] [--window 5] \
+  [--publisher-timeout 1800] [--batch-size 1] \
   [--from-file tests/fixtures/ga4_events_sample.jsonl] [--replace-day]
 # --load: upload JSONL to the real raw dataset without GCS.
+# --publisher-timeout: cap the extraction/publish stage independently of output settling.
+# --batch-size: raw payloads per emulator message; default 1 keeps the original wire format.
 # --replace-day: explicitly allow replacing a populated daily table (destructive).
 ```
+
+Every replay records the publisher's raw-event counters. Before raw loading,
+`verify_replay_output.py` checks `valid + dead-letter + quality-dropped`
+against those counters. Informational quality rows are not treated as dropped
+records. An incomplete count remains bounded by `--timeout`; a count exceeding
+input, or another accounting error, blocks the raw load. File sizes staying
+stable alone is not accepted as proof that the subscription finished.
+
+For large bounded replays, `REPLAY_BATCH_SIZE=64` (or `--batch-size 64`)
+reduces message overhead by packaging unchanged raw payload strings into a
+JSON array. The pipeline unpacks and validates each one separately, so a bad
+payload still becomes its own dead-letter record. Use a fresh raw dataset for
+new experiments instead of relying on overwrite behavior during tests.
+
+### Bounded replay for a known input count
+
+Native streaming via `ReadFromPubSub` remains the default and is exercised by
+small fixtures. For a deterministic larger replay, `--bounded-replay` (or
+`BOUNDED_REPLAY=1`) adds a bounded broker-to-snapshot phase:
+
+1. `collect_broker_replay.py` pulls only from the local emulator and unpacks
+   batches without rewriting the inner raw payloads.
+2. It writes a new snapshot, flushes it before ACK, and deduplicates redelivered
+   message IDs. It cannot use an old snapshot: the output is created in exclusive
+   mode and collection has a deadline.
+3. After the publisher's counters and the collected events agree, the owned
+   emulator is stopped before DirectRunner reads the bounded file. An externally
+   started broker is not stopped by this code.
+4. DirectRunner still performs the normal parsing, normalization, quality and
+   deduplication work. Raw loading still requires exact accounting from
+   `verify_replay_output.py`.
+
+```bash
+BOUNDED_REPLAY=1 REPLAY_BATCH_SIZE=64 \
+  bash scripts/run_emulator_replay.sh --load --timeout 600 --publisher-timeout 1800
+```
+
+This mode is for a known finite test batch. Snapshot ACK is not a claim of
+exactly-once distributed delivery or durable production streaming semantics.
+Unexpected output counts must still prevent the load; use a fresh raw dataset
+when retrying rather than replacing populated data by accident.
 
 `run_emulator_chain.sh` is a compatibility wrapper around this orchestrator for
 offline fixtures. It retains `build/emulator_run`, verifies the usual 4/2/4
@@ -223,6 +271,27 @@ python scripts/load_raw_to_bigquery.py --from-jsonl build/emulator_run
 # then point dbt at the raw dataset (BQ_RAW_PROJECT/BQ_RAW_DATASET in .env)
 # and run scripts/rebuild_warehouse.sh
 ```
+
+## KPI CSV and Streamlit sandbox checks
+
+Use `export_kpi_csv.py` to query three real BigQuery KPI views and produce
+Looker-compatible snapshots, rather than generating CSV from mock data:
+
+```bash
+python scripts/export_kpi_csv.py --project YOUR_GCP_PROJECT_ID \
+  --start-date 2020-12-18 --end-date 2020-12-18 \
+  --out-dir build/dashboard_exports/20201218
+```
+
+Required date headers, row caps (10,000 per view) and byte guards are enforced.
+The exporter refuses to overwrite an existing CSV or manifest. `manifest.json`
+labels the result as a manual-upload snapshot, not a live BigQuery connector.
+
+`smoke_streamlit_sandbox.py --role all --output build/smoke_dashboard_20201218.json`
+runs Streamlit with `DASHBOARD_DATA_SOURCE=bigquery`. It fails on runtime
+exceptions, an error block, or failure to render the role's home page. Use
+`bash scripts/smoke_docker_dashboard.sh` for the native HTTP health endpoint,
+compose limits and cleanup. Files in `build/` are ignored by Git.
 
 ## Quota reports, sandbox verification and Docker dashboard
 

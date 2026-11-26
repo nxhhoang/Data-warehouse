@@ -1,18 +1,30 @@
--- Reconcile item-level revenue (fct_purchase_items) against order-level revenue
--- (stg_valid_orders), as promised in report section 4.5: session-level revenue
--- and total item_revenue_usd are reconciled with dbt tests, and any gap is
--- recorded in the data quality log.
--- Together with assert_revenue_reconciliation.sql (fct_sessions vs stg_valid_orders),
--- this closes the chain: fct_sessions <-> stg_valid_orders <-> fct_purchase_items.
+-- Reconcile item-level transformation from stg_ga4_items to fct_purchase_items.
+-- The contract applies at (user_key, transaction_id), not as a global row/money sum.
+-- Keep positive source item revenue; otherwise derive price_usd * quantity.
 --
--- Join key: (user_key, transaction_id). fct_purchase_items does not carry
--- user_pseudo_id, so match through dim_user the same way fct_events builds user_key
--- (COALESCE to -1 for users absent from dim_user, e.g. blank user_pseudo_id).
+-- Order-level purchase_revenue_in_usd is an independent, obfuscated GA4 measure.
+-- It need not exactly equal item revenue, so it is shown as a diagnostic column,
+-- not used to judge whether the source-item -> fact-item transformation is correct.
+-- Count mismatches and a source vs fact discrepancy over $0.01 fail this test.
+-- A valid order with no source items must not be given fabricated fact item rows.
 --
--- Any returned row is a transaction whose summed item revenue (including the
--- price * quantity fallback) does not match the order revenue within $0.01,
--- or an order that has no item rows at all. Record failures in data/quality_log/.
-WITH item_totals AS (
+-- Diagnostic gaps belong in the quality report. They are distinct from the ETL
+-- failures returned by this test.
+WITH source_item_totals AS (
+    SELECT
+        event_id,
+        COUNT(*) AS item_rows,
+        SUM(
+            CASE
+                WHEN item_revenue_usd > 0 THEN item_revenue_usd
+                ELSE price_usd * quantity
+            END
+        ) AS item_revenue
+    FROM {{ ref('stg_ga4_items') }}
+    WHERE event_name = 'purchase'
+    GROUP BY event_id
+),
+item_totals AS (
     SELECT
         user_key,
         transaction_id,
@@ -25,13 +37,19 @@ SELECT
     o.user_pseudo_id,
     o.transaction_id,
     o.revenue_usd AS order_revenue,
-    COALESCE(i.item_rows, 0) AS item_rows,
-    ROUND(COALESCE(i.item_revenue, 0.0), 2) AS item_revenue,
-    ROUND(o.revenue_usd - COALESCE(i.item_revenue, 0.0), 2) AS revenue_gap
+    COALESCE(s.item_rows, 0) AS source_item_rows,
+    COALESCE(i.item_rows, 0) AS fact_item_rows,
+    ROUND(COALESCE(s.item_revenue, 0.0), 2) AS source_item_revenue,
+    ROUND(COALESCE(i.item_revenue, 0.0), 2) AS fact_item_revenue,
+    ROUND(COALESCE(s.item_revenue, 0.0) - COALESCE(i.item_revenue, 0.0), 2) AS source_to_fact_gap,
+    ROUND(o.revenue_usd - COALESCE(s.item_revenue, 0.0), 2) AS order_vs_source_gap
 FROM {{ ref('stg_valid_orders') }} o
+LEFT JOIN source_item_totals s
+    ON o.event_id = s.event_id
 LEFT JOIN {{ ref('dim_user') }} u
     ON o.user_pseudo_id = u.user_pseudo_id
 LEFT JOIN item_totals i
     ON i.user_key = COALESCE(u.user_key, -1)
     AND i.transaction_id = o.transaction_id
-WHERE ABS(o.revenue_usd - COALESCE(i.item_revenue, 0.0)) > 0.01
+WHERE COALESCE(i.item_rows, 0) != COALESCE(s.item_rows, 0)
+   OR ABS(COALESCE(s.item_revenue, 0.0) - COALESCE(i.item_revenue, 0.0)) > 0.01

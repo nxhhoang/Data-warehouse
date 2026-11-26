@@ -29,7 +29,11 @@ if [ "${LOAD_RAW:-0}" = "1" ] || [ "${BUILD_WAREHOUSE:-0}" = "1" ]; then
   fi
 fi
 
-args=(--timeout "${REPLAY_TIMEOUT_SEC:-240}" --window "${DEDUP_WINDOW_SEC:-5}")
+args=(--timeout "${REPLAY_TIMEOUT_SEC:-240}" --window "${DEDUP_WINDOW_SEC:-5}"
+      --batch-size "${REPLAY_BATCH_SIZE:-1}")
+if [ "${BOUNDED_REPLAY:-0}" = "1" ]; then
+  args+=(--bounded-replay)
+fi
 if [ -n "${REPLAY_SOURCE_FILE:-}" ]; then
   args+=(--from-file "$REPLAY_SOURCE_FILE")
 fi

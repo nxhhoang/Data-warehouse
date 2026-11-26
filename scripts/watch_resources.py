@@ -229,8 +229,9 @@ def _terminate_posix(record: dict, pid: int, sig: int) -> None:
     os.kill(pid, sig)
 
 
-def stop_registered(pid_dir: Path, grace_seconds: float = 3.0) -> None:
-    """Stop every registered live process, then remove its PID file.
+def stop_registered(pid_dir: Path, grace_seconds: float = 3.0,
+                   label_prefix: str | None = None) -> None:
+    """Stop registered live processes, optionally limited by label prefix.
 
     Command lines are validated against the registered token first. On Windows
     taskkill /T also stops descendants such as the Beam local worker.
@@ -247,6 +248,8 @@ def stop_registered(pid_dir: Path, grace_seconds: float = 3.0) -> None:
         try:
             record = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
+            continue
+        if label_prefix and not str(record.get("label", "")).startswith(label_prefix):
             continue
         pid = record.get("pid")
         token = str(record.get("token", ""))
@@ -313,6 +316,8 @@ def main() -> int:
                         help="register a Windows listener PID for reliable cleanup")
     parser.add_argument("--label", default="emulator")
     parser.add_argument("--token", default="cloud-pubsub-emulator")
+    parser.add_argument("--label-prefix", default=None,
+                        help="only stop registrations whose labels start with this prefix")
     args = parser.parse_args()
     if args.register_listener is not None:
         try:
@@ -323,7 +328,7 @@ def main() -> int:
         print(f"[watch] registered {record['label']} listener pid={record['pid']}")
         return 0
     if args.stop_dir:
-        stop_registered(args.stop_dir)
+        stop_registered(args.stop_dir, label_prefix=args.label_prefix)
         return 0
     return monitor(args.pid_dir, args.interval, args.once)
 
