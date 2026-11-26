@@ -1,11 +1,11 @@
-\section{Thiết kế mô hình chiều}
+\subsection{Thiết kế mô hình chiều}
 \label{sec:dimensional-model}
 
 Mô hình được thiết kế theo hướng Kimball cho quá trình truy cập và mua hàng trên website thương mại điện tử \parencite{kimball2013}. Quy trình gồm bốn bước: chọn quy trình nghiệp vụ, khai báo grain cho từng bảng fact, chọn dimension và xác định measure. Kho sử dụng \textbf{4 bảng fact và 8 bảng dimension dùng chung}, được dựng bởi dbt thành các schema \texttt{staging}, \texttt{core} và \texttt{marts}. \medskip
 
 Ba bảng staging (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}, \texttt{stg\_valid\_orders}) là view dùng để chuẩn hóa nguồn, làm phẳng tham số và mặt hàng, khử trùng sự kiện và xác định giao dịch hợp lệ. Các bảng fact và dimension trong \texttt{core} là bảng vật lý. Các bảng trong \texttt{marts} tổng hợp số đo theo grain phục vụ báo cáo, còn ba KPI view tính tỷ lệ từ cùng một tập tử số và mẫu số.
 
-\subsection{Grain của bốn bảng fact}
+\subsubsection{Grain của bốn bảng fact}
 
 \begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
 \caption{Bốn bảng fact và grain tương ứng}
@@ -40,7 +40,7 @@ Ba bảng staging (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}, \texttt{
 & Phễu cấp mặt hàng cho bốn loại sự kiện trên. Hai bước điền thông tin giao hàng/thanh toán không phân tích ở cấp mặt hàng này. \\
 \end{xltabular}
 
-\subsection{Chi tiết bốn bảng fact}
+\subsubsection{Chi tiết bốn bảng fact}
 
 \begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X}
 \caption{Dữ liệu trong \texttt{fct\_events}}
@@ -209,7 +209,7 @@ Ba bảng staging (\texttt{stg\_ga4\_events}, \texttt{stg\_ga4\_items}, \texttt{
 & \texttt{FLOAT64} doanh thu mặt hàng. Giá trị dương sẵn có được ưu tiên; còn lại tính \texttt{price\_usd $\times$ quantity}. Doanh thu cấp đơn không được nhân đô trên các dòng item của cùng giao dịch. \\
 \end{xltabular}
 
-\subsection{Tám bảng dimension}
+\subsubsection{Tám bảng dimension}
 
 \begin{xltabular}{\textwidth}{>{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{4.5cm} >{\raggedright\arraybackslash}X}
 \caption{Khóa và thuộc tính của tám dimension}
@@ -285,7 +285,7 @@ Mỗi dimension thêm một dòng dự phòng có khóa $-1$, thường gọi l�
 \scriptsize{$\bullet\bullet$: \texttt{dim\_traffic\_source} đóng hai vai trò, nguồn cấp phiên và nguồn cấp người dùng.}
 \end{table}
 
-\subsection{Các bảng trong data marts}
+\subsubsection{Các bảng trong data marts}
 
 Marts chỉ lưu các số đếm và số tiền có thể cộng theo grain, không lưu sẵn tỷ lệ để tránh cộng các tỷ lệ không tương thích mẫu. Các tỷ lệ chuyển đổi, AOV, doanh thu trên phiên hoặc trên người dùng được tính từ tử số và mẫu số ở KPI views.
 
