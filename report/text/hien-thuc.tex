@@ -116,23 +116,148 @@ RAW_DATASET=marketing_dss_docker_tutorial \
 
 Dataset test mới giúp tránh ghi đè batch trước. Nếu dùng lại dataset đã có dữ liệu, loader sẽ báo lỗi ở guard thay vì tự xóa bảng; phải đổi dataset hoặc chủ động thêm \texttt{REPLACE\_RAW\_DAY=1} khi chấp nhận thay cả bảng ngày. Dừng toàn bộ service bằng \texttt{docker compose down --remove-orphans}. Giới hạn runtime là 2 GiB và 1.5 CPU cho replay, 1 GiB và 1 CPU cho dashboard; giới hạn này được kiểm tra bằng \texttt{docker inspect} và \texttt{docker stats}.
 
-\subsection{Dữ liệu hiển thị và Looker Studio}
+\subsection{Giao diện và các chức năng hỗ trợ ra quyết định}
 
-Giao diện dashboard chính của hệ thống được xây dựng trên nền tảng Streamlit, cho phép người dùng tương tác và lọc dữ liệu linh hoạt theo khoảng thời gian, kênh tiếp thị, nguồn/medium, thiết bị, quốc gia cùng nhiều chiều phân tích chuyên biệt cho từng trang. Hệ thống được tổ chức thành 9 trang chức năng: tổng quan, so sánh hiệu suất, chất lượng kênh, phễu chuyển đổi, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Lưu ý rằng các tab điều hướng theo vai trò (CMO, Manager, Specialist) chỉ có tác dụng nhóm và lọc giao diện trang hiển thị tương ứng với góc nhìn nghiệp vụ, không đóng vai trò là cơ chế phân quyền bảo mật. \medskip
+Dashboard được xây dựng bằng Streamlit, gồm chín trang cho các chức năng phân tích, cùng bộ lọc đa chiều là chức năng dùng chung thứ mười. Các nhãn CMO, Manager và Specialist chỉ thay đổi nhóm trang được hiển thị theo Bảng~\ref{tab:dashboard-role-mapping}, không phải cơ chế xác thực hay phân quyền dữ liệu. \medskip
 
-Bộ lọc dùng chung gồm khoảng thời gian, kênh, thiết bị, quốc gia, nguồn/medium, chiến dịch, loại người dùng và nhóm sản phẩm. Bộ lọc được giữ khi chuyển sang khoảng thời gian trước đó hoặc đổi vai trò. Các lựa chọn chỉ được áp dụng khi dữ liệu có chiều tương ứng: nhóm sản phẩm chỉ lọc phần phân tích sản phẩm, trong khi quốc gia và loại người dùng chỉ lọc KPI theo phiên. Nguồn/medium và chiến dịch được áp dụng cho cả KPI phiên lẫn dữ liệu sản phẩm. Cách giới hạn này tránh gán một chiều không có trong bảng dữ liệu sản phẩm vào các số liệu không thể phân bổ chính xác. Trang Truy vết cũng truyền cùng các bộ lọc này vào câu SQL đối chiếu với Core. \medskip
+Ảnh minh họa trong phần này dùng \texttt{DASHBOARD\_DATA\_SOURCE=mock}. Dữ liệu mock có cùng schema với hai frame đọc từ BigQuery, trải dài từ 01/11/2020 đến 31/01/2021, nên có thể minh họa trực quan xu hướng, các kỳ so sánh, phễu và cảnh báo. Mock giúp quan sát cách giao diện hoạt động, không đại diện cho số liệu kinh doanh thật của GA4 và không đi qua replay Publisher -- Emulator -- DirectRunner trước khi hiển thị. Các kết quả kiểm chứng trên BigQuery Sandbox vẫn được trình bày riêng trong phần Đánh giá. \medskip
 
-Nhóm A của hệ thống KPI đã có đủ sáu chỉ số: số người dùng, số phiên, số phiên/người dùng, số lượt xem trang, tỷ lệ phiên có tương tác và tỷ lệ người dùng mới. Người dùng chọn các chỉ số này trong biểu đồ xu hướng của trang Tổng quan hoặc xem chi tiết tại trang Truy vết. Sáu thẻ KPI cố định trên Tổng quan là lựa chọn thống nhất để giữ bố cục dễ đọc, không nhằm mục đích hiển thị toàn bộ bảng KPI ngay ở phần headline. \medskip
+Với dữ liệu thật, KPI theo phiên được tính từ \texttt{core.fct\_sessions} và conformed dimensions; phần sản phẩm được đọc từ \texttt{marts.fct\_product\_channel\_daily} và dimensions. Ba \texttt{kpi.v\_kpi\_*} được dùng cho CSV/Looker Studio, không phải nguồn truy vấn trực tiếp của Streamlit. Trên mọi trang, tỷ lệ được tính lại sau khi lọc và nhóm bằng cách cộng tử số/mẫu số rồi mới chia, không lấy trung bình tỷ lệ giữa các dòng hoặc các nhóm.
 
-Từ cùng một kho dữ liệu tập trung, luồng hiển thị được tách thành hai nhánh phục vụ hai mục đích khác nhau: các bảng ở tầng BigQuery Core/Marts cung cấp dữ liệu trực tiếp cho ứng dụng Streamlit tương tác; trong khi đó, ba KPI view được dùng để xuất định dạng CSV phục vụ báo cáo trên Looker Studio, cho phép cập nhật nhanh số liệu trình bày chỉ bằng một thao tác xuất file mới. \medskip
+\subsubsection{Bố cục dashboard và bộ lọc dùng chung}
 
-Cụ thể, để đáp ứng nhu cầu trình bày trên Looker Studio trong giới hạn môi trường không kích hoạt billing, người dùng có thể xuất trực tiếp kết quả tổng hợp từ BigQuery Console ra tệp CSV và tải lên Looker Studio dưới dạng nguồn dữ liệu tệp tin (File Upload). Ba KPI view được sử dụng cho luồng này bao gồm:
+Bộ lọc trả lời câu hỏi: ``đang phân tích tập dữ liệu nào, ở vai trò và chiều nào?''. Vùng bên trái gồm role selector và điều hướng trang; phần mở rộng ``Bộ lọc'' gồm tám lựa chọn: khoảng thời gian, kênh, thiết bị, quốc gia, nguồn/medium, chiến dịch, nhóm sản phẩm và loại người dùng.
 
-\begin{itemize}
-  \item \texttt{v\_kpi\_traffic\_engagement}
-  \item \texttt{v\_kpi\_funnel}
-  \item \texttt{v\_kpi\_conversion\_revenue}
-\end{itemize}
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp sidebar mở ``Bộ lọc'', đủ role selector, các liên kết trang và tám bộ lọc. Phần bên phải có thể thấy đầu trang Tổng quan.}{global-filters.png}
+  \caption{Bố cục chung của dashboard và các chiều lọc dữ liệu.}
+  \label{fig:ui-global-filters}
+\end{figure}
 
-Trong các báo cáo này, trường \texttt{event\_date} đóng vai trò là trục thời gian, trong khi kênh tiếp thị và loại thiết bị được sử dụng làm các chiều phân tích chính. Khi thực hiện gom nhóm nhiều dòng dữ liệu ở tầng hiển thị, các chỉ số tỷ lệ bắt buộc phải được tính toán lại từ tổng các thành phần gốc (số đếm hoặc doanh thu) thay vì lấy trung bình cộng của các tỷ lệ đã tính sẵn, nhằm tránh sai lệch thống kê. Cần lưu ý rằng việc xuất tệp CSV tĩnh chỉ đóng vai trò chia sẻ một bản chụp dữ liệu (snapshot) tại thời điểm xuất, chứ không thiết lập kết nối trực tiếp (live connection) để tự động đồng bộ với BigQuery.
+Bộ lọc không tạo KPI mà chọn tập dữ liệu để tính KPI. Nhóm sản phẩm chỉ lọc product frame; quốc gia và loại người dùng chỉ lọc KPI theo phiên. Nguồn/medium và chiến dịch áp dụng cho cả KPI phiên lẫn dữ liệu sản phẩm nhờ các dimension chung. Các lựa chọn được giữ qua kỳ so sánh và khi đổi role, đồng thời được truyền vào SQL đối chiếu Core ở trang Truy vết.
 
+\subsubsection{Tổng quan điều hành}
+
+Trang này phục vụ CMO trả lời: lưu lượng, giao dịch và doanh thu hiện ra sao; kênh nào đóng góp nhiều nhất; kết quả có thay đổi rõ so với kỳ trước không. Sáu thẻ headline gồm sessions, distinct users, conversion rate, orders, revenue và AOV. \medskip
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp sáu thẻ headline, dropdown xu hướng và phần hiệu suất theo kênh. Nếu chữ nhỏ, có thể chụp riêng bảng kênh thay vì thu toàn trang.}{overview.png}
+  \caption{Sáu KPI headline và xu hướng trên trang Tổng quan.}
+  \label{fig:ui-overview}
+\end{figure}
+
+Với $S$ là tổng số phiên, $B$ là số phiên có giao dịch hợp lệ, $O$ là tổng đơn hàng hợp lệ và $R$ là doanh thu, trang hiển thị $\mathrm{CR}=B/S$, $\mathrm{AOV}=R/O$ và $\mathrm{RPS}=R/S$, trong đó RPS là doanh thu trên mỗi phiên. Tỷ trọng doanh thu của kênh được tính bằng doanh thu kênh chia cho tổng doanh thu \textbf{sau filter}. \medskip
+
+Sáu thẻ trên không phải toàn bộ nhóm KPI A. Dropdown xu hướng vẫn có đủ sáu chỉ số nhóm A: số người dùng, số phiên, số phiên/người dùng, lượt xem trang, tỷ lệ phiên tương tác và tỷ lệ người dùng mới. Người dùng có thể đổi nhóm ngày/tuần/tháng và vào Truy vết để kiểm tra công thức, thay vì phải hiển thị tất cả KPI ngay ở headline.
+
+\subsubsection{So sánh hiệu suất}
+
+CMO và Manager dùng chức năng này để biết kênh/chiến dịch nào dẫn đầu theo cùng tiêu chí, và sự khác biệt đến từ nhiều phiên hơn, tỷ lệ chuyển đổi tốt hơn hay doanh thu trên mỗi phiên cao hơn.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp tab ``So sánh nhóm'' với tiêu chí xếp hạng, bảng KPI và ghi chú nhóm dưới 100 phiên. Có thể bổ sung tab ``So sánh hai kỳ'' ở phụ lục.}{compare-groups.png}
+  \caption{So sánh nhiều nhóm trên cùng bộ KPI.}
+  \label{fig:ui-compare-groups}
+\end{figure}
+
+Revenue, conversion rate, AOV và revenue/session được tính lại theo từng nhóm sau filter. Nhóm có ít hơn 100 phiên vẫn hiện ở bảng nhưng được gắn nhãn mẫu nhỏ và xếp sau, tránh để một vài giao dịch tạo hiệu ứng xếp hạng mạnh giả tạo. Khi so sánh hai kỳ, tỷ lệ thay đổi là $(B-A)/|A|$; nếu $A=0$ thì giá trị không xác định, không phải tăng vô hạn.
+
+\subsubsection{Phân tích chất lượng kênh}
+
+Chức năng này giải quyết hai bài toán phân bổ nguồn lực cốt lõi: nhận diện các kênh có lưu lượng lớn nhưng hiệu quả chuyển đổi thấp để tối ưu chi phí, đồng thời phát hiện các kênh quy mô nhỏ nhưng tỷ lệ chuyển đổi cao nhằm cân nhắc mở rộng đầu tư.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp bubble chart với bốn quadrant, hai đường ngưỡng và bảng gợi ý hành động phía dưới.}{channel-quality.png}
+  \caption{Đối chiếu quy mô phiên với chất lượng từng kênh.}
+  \label{fig:ui-channel-quality}
+\end{figure}
+
+Trục hoành là số phiên theo thang log, trục tung là conversion rate, revenue/session hoặc engagement rate; kích thước bong bóng là doanh thu. Ngưỡng dọc là trung vị sessions của các nhóm có ít nhất 100 phiên. Ngưỡng ngang là KPI tính trên toàn bộ filtered frame, không phải trung bình các tỷ lệ riêng của từng kênh. Nhóm dưới 100 phiên vẫn có trong bảng nhưng không được xếp vào các quadrant trên biểu đồ. Các lời khuyên về ngân sách chỉ là gợi ý định tính, không phải phép tối ưu chi phí/ROI vì dữ liệu không có ad spend.
+
+\subsubsection{Phễu chuyển đổi và phân tích sản phẩm}
+
+Chức năng phục vụ Specialist phát hiện bước nào có nhiều phiên rời bỏ nhất và sự khác biệt giữa kênh, thiết bị, mức tương tác hoặc nhóm hành vi.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp đủ sáu bước phễu, toggle chỉ các ngày có add\_to\_cart, tỷ lệ chuyển tiếp và bước rời bỏ lớn nhất.}{funnel-six-steps.png}
+  \caption{Phễu sáu bước và vị trí rời bỏ lớn nhất.}
+  \label{fig:ui-funnel}
+\end{figure}
+
+Phễu gồm \texttt{view\_item} $\rightarrow$ \texttt{add\_to\_cart} $\rightarrow$ \texttt{begin\_checkout} $\rightarrow$ \texttt{add\_shipping\_info} $\rightarrow$ \texttt{add\_payment\_info} $\rightarrow$ giao dịch hợp lệ. Tử số của purchase completion là các phiên có cả payment info và giao dịch hợp lệ; abandonment lấy $1$ trừ tỷ lệ phiên có cả cart và giao dịch hợp lệ trên số phiên có cart. Các bước được đếm bằng cờ phiên, không đòi hỏi đúng thứ tự, nên không diễn giải thành một chuỗi hành trình bắt buộc. Toggle mặc định chỉ giữ ngày có cart tracking; ngày thiếu tracking được để trống, không nội suy. \medskip
+
+Tab ``Theo nhóm sản phẩm'' minh họa các bước item view, add-to-cart, checkout, units sold và item revenue; tỷ lệ bổ trợ là $\sum\text{units sold}/\sum\text{checkout events}$. Dữ liệu dùng \texttt{fct\_item\_events} và \texttt{fct\_purchase\_items} ở upstream rồi được tổng hợp trong product mart. Không đưa conversion rate ``xem sản phẩm $\rightarrow$ mua'' vào báo cáo như một kết luận chính xác vì catalog bị làm mờ gần như tách rời giữa hai hoạt động. Nhóm sản phẩm chỉ lọc product frame và không được dùng làm bằng chứng rằng KPI phiên được lọc theo item.
+
+\subsubsection{Phân tích chi tiết theo hierarchy}
+
+Chức năng này hỗ trợ người dùng truy vết nguyên nhân suy giảm hiệu suất của một kênh bằng cách khoan sâu qua các cấp phân cấp: từ kênh xuống nguồn và chiến dịch, theo lát cắt thời gian (tháng, tuần, ngày) hoặc đi sâu vào từng danh mục và sản phẩm cụ thể.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Sau khi chọn một dòng, chụp breadcrumb cùng dữ liệu cấp con để chứng minh tương tác drill-down. Không chỉ chụp màn hình ban đầu.}{drilldown-breadcrumb.png}
+  \caption{Breadcrumb và dữ liệu con sau khi drill-down.}
+  \label{fig:ui-drilldown}
+\end{figure}
+
+Ba hierarchy là kênh $\rightarrow$ nguồn/medium $\rightarrow$ chiến dịch; tháng $\rightarrow$ tuần $\rightarrow$ ngày; và nhóm sản phẩm $\rightarrow$ sản phẩm. Mỗi cấp con được tính trong subset của node cha, dùng lại CR, AOV, RPS, orders và distinct users. Share doanh thu được tính \textbf{trong node cha}, không phải trên toàn view trước filter. Nhánh sản phẩm cộng các measure theo \texttt{item\_category} rồi \texttt{item\_name}. Không mô tả click trực tiếp từ biểu đồ Tổng quan xuống chiến dịch; người dùng cần chuyển sang trang ``Phân tích chi tiết''.
+
+\subsubsection{Phân khúc khách hàng}
+
+Phân khúc giúp trả lời nhóm nào chiếm nhiều phiên nhưng ít doanh thu, và nhóm hành vi nào có conversion hoặc revenue/session vượt mức chung.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp hồ sơ phân khúc với tỷ trọng phiên/doanh thu, CR index và RPS index. Ảnh ma trận hai chiều có thể chụp thêm ở phụ lục.}{segments-profile.png}
+  \caption{So sánh các nhóm hành vi với giá trị chung của tập đang lọc.}
+  \label{fig:ui-segments}
+\end{figure}
+
+Với mỗi nhóm $g$, tỷ trọng phiên là $S_g/S_{\text{filtered}}$, share doanh thu là $R_g/R_{\text{filtered}}$, CR index là $CR_g/CR_{\text{overall}}$ và RPS index là $RPS_g/RPS_{\text{overall}}$. Các ô dưới 100 phiên được để trống. Distinct users được tính lại trong filtered subset, không cộng các số users qua ngày/kênh/thiết bị. Phân khúc mức tương tác dùng các khoảng thời gian định sẵn, không phải machine learning. Cờ ``người dùng mới'' ở đây chỉ phiên chứa \texttt{first\_visit}, khác với thuộc tính \texttt{is\_new\_user} theo user.
+
+\subsubsection{Cảnh báo theo ngưỡng}
+
+Chức năng đánh dấu kênh/chiến dịch có conversion, doanh thu hoặc phiên giảm vượt ngưỡng, abandonment tăng mạnh, hoặc traffic tăng nhưng conversion không tăng.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp khung ba slider, cửa sổ 7/14/28 ngày và bảng cảnh báo với mức độ, giá trị hai kỳ và tỷ lệ thay đổi.}{alerts-thresholds.png}
+  \caption{Cảnh báo giữa hai kỳ liên tiếp do người dùng chọn ngưỡng.}
+  \label{fig:ui-alerts}
+\end{figure}
+
+Với $x$ là giá trị hiện tại và $p$ là giá trị kỳ trước, mức thay đổi là $(x-p)/|p|$. Rule giảm kích hoạt khi mức biến thiên xuống đạt ngưỡng, abandonment áp dụng hướng ngược lại, còn mức ``Nghiêm trọng'' xuất hiện khi biến thiên gấp đôi ngưỡng. Spike cần traffic tăng từ ngưỡng đã chọn nhưng conversion không tăng. Nhóm phải đủ số phiên ở cả hai kỳ, còn abandonment được tính riêng trên các ngày có cart tracking. Đây là phép kiểm tra khi đang mở dashboard, không phải job chạy nền hoặc thông báo email/Slack tự động.
+
+\subsubsection{Mô phỏng kịch bản}
+
+Câu hỏi what-if là: nếu tăng lưu lượng hoặc conversion của một kênh, số đơn và doanh thu ước tính thay đổi bao nhiêu khi các điều kiện khác giữ nguyên?
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp editor khi đã nhập một giả định khác 0, ví dụ tăng lưu lượng hoặc conversion của một kênh.}{scenario-editor.png}
+  \caption{Nhập giả định lưu lượng và conversion theo từng kênh.}
+  \label{fig:ui-scenario-editor}
+\end{figure}
+
+Với $t$ là mức thay đổi lưu lượng và $c$ là mức thay đổi conversion:
+\[
+S_{new}=S(1+t),\qquad CR_{new}=\operatorname{clip}(CR(1+c),0,1).
+\]
+Số đơn mới bằng $S_{new}\times CR_{new}\times(O/\text{purchasing sessions})$ và doanh thu mới bằng số đơn mới nhân AOV lịch sử. Trang giữ cố định orders/purchase session và AOV, rồi dùng waterfall để hiển thị chênh lệch so với hiện trạng. Kết quả là \textbf{ước tính what-if}, không phải doanh thu thực hoặc forecast. 
+
+\subsubsection{Truy vết số liệu và kiểm chứng với Core}
+
+Truy vết trả lời một KPI được tính từ tử số/mẫu số nào, những phiên nào tạo ra nó và con số trên UI có khớp SQL độc lập từ Core không.
+
+\begin{figure}[H]
+  \centering
+  \uiFigure{Chụp công thức, numerator/denominator, lineage, bản ghi phiên và phần SQL có tham số filter. Nút kết quả ``Khớp'' chỉ chụp khi thực sự đối chiếu trên BigQuery.}{trace-definition.png}
+  \caption{Từ KPI tới tử/mẫu, lineage và bản ghi nguồn.}
+  \label{fig:ui-trace}
+\end{figure}
+
+Chức năng này trích xuất giá trị tử số và mẫu số trực tiếp từ tập dữ liệu đang lọc, đồng thời hiển thị tường minh công thức tính của từng nhóm KPI cùng danh sách các phiên giao dịch liên quan (giới hạn tối đa 200 dòng trên giao diện và cho phép xuất tệp CSV đầy đủ). Hệ thống thực hiện đối chiếu chéo giữa giá trị hiển thị trên giao diện và kết quả truy vấn SQL độc lập từ tầng Core với ngưỡng sai số cho phép tối đa là $0,01$. Trong chế độ dữ liệu giả lập, giao diện này đóng vai trò minh họa trực quan quy trình truy vết nguồn gốc dữ liệu và không đại diện cho kết quả đối chiếu thực tế trên BigQuery.

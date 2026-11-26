@@ -165,6 +165,22 @@
 \usepackage{float}
 %
 
+% Use a real UI screenshot when it exists, otherwise show its capture guide.
+\newcommand{\uiFigure}[2]{%
+  \IfFileExists{image/ui/#2}{%
+    \includegraphics[width=0.94\textwidth]{image/ui/#2}%
+  }{%
+    \fbox{%
+      \begin{minipage}[c][4cm][c]{0.9\textwidth}
+        \centering
+        \textbf{[ẢNH PLACEHOLDER]}\\[2mm]
+        #1\\[1.5mm]
+        \textit{File dự kiến}: \texttt{image/ui/#2}
+      \end{minipage}%
+    }%
+  }%
+}
+
 % DOCUMENT
 \begin{document}
 
