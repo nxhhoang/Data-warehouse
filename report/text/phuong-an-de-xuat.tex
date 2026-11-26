@@ -251,7 +251,7 @@ Chuyển đổi là sự kiện \texttt{purchase} được ghi nhận theo ngu�
 \begin{enumerate}
     \item \textbf{Tổng quan điều hành:} Các KPI chính, xu hướng theo ngày/tuần/tháng, so sánh với kỳ trước.
 
-    \item \textbf{Bộ lọc đa chiều:} Theo khoảng thời gian, kênh, nguồn/chiến dịch, thiết bị, quốc gia/khu vực và nhóm sản phẩm.
+    \item \textbf{Bộ lọc đa chiều:} Theo khoảng thời gian, kênh, nguồn/medium, chiến dịch, thiết bị, quốc gia/khu vực, nhóm sản phẩm và loại người dùng. Bộ lọc nhóm sản phẩm chỉ tác động đến dữ liệu sản phẩm; quốc gia và loại người dùng chỉ áp dụng cho các số liệu theo phiên nơi có các chiều tương ứng.
 
     \item \textbf{So sánh hiệu suất:} Đặt nhiều kênh, chiến dịch hoặc kỳ cạnh nhau trên cùng bộ chỉ số; xếp hạng theo doanh thu, tỷ lệ chuyển đổi và doanh thu trên mỗi phiên.
 
@@ -269,6 +269,43 @@ Chuyển đổi là sự kiện \texttt{purchase} được ghi nhận theo ngu�
 
     \item \textbf{Truy vết số liệu:} Từ một con số trên dashboard xem được công thức và các bản ghi nguồn tạo ra nó.
 \end{enumerate}
+
+\subsection{Ánh xạ chức năng giao diện với người ra quyết định}
+
+Bảng dưới đây phản ánh cách giao diện nhóm các trang theo vai trò. Mục đích là giúp người đọc nhận ra ngay phần nào của ứng dụng được thiết kế cho quyết định điều hành, theo dõi chiến dịch hay phân tích chuyên sâu về hành vi mua hàng. Bộ lọc đa chiều là thành phần dùng chung trên các trang, nên hệ thống có mười chức năng nhưng chín trang giao diện. \medskip
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.25}
+    \caption{Chức năng giao diện theo từng nhóm người ra quyết định}
+    \label{tab:dashboard-role-mapping}
+    \begin{tabularx}{\textwidth}{
+        >{\raggedright\arraybackslash}p{3.8cm}
+        >{\raggedright\arraybackslash}p{2.0cm}
+        >{\raggedright\arraybackslash}p{3.7cm}
+        X
+    }
+        \hline
+        \textbf{Chức năng} &
+        \textbf{CMO} &
+        \textbf{Digital Marketing Manager} &
+        \textbf{E-commerce \& Content Specialist} \\
+        \hline
+        Tổng quan điều hành & Có & - & - \\
+        Bộ lọc đa chiều & Dùng chung & Dùng chung & Dùng chung \\
+        So sánh hiệu suất & Có & Có & - \\
+        Phân tích chất lượng kênh & Có & Có & - \\
+        Phân tích phễu chuyển đổi & - & - & Có \\
+        Phân tích chi tiết & - & Có & Có \\
+        Phân khúc khách hàng & - & - & Có \\
+        Cảnh báo theo ngưỡng & Có & Có & - \\
+        Mô phỏng kịch bản & Có & Có & - \\
+        Truy vết số liệu & Có & Có & Có \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Chế độ ``CMO'' mở đầu tiên trang Tổng quan, ``Manager'' mở trang So sánh hiệu suất, còn ``Specialist'' mở trang Phễu chuyển đổi. Chế độ ``Tất cả'' hiển thị đủ chín trang để người dùng xem ngoài nhóm chức năng mặc định của vai trò mình, chẳng hạn CMO cần xem phân khúc khách hàng. Các vai trò chỉ thay đổi điều hướng và nhóm trang được trình bày, không phải cơ chế xác thực hoặc phân quyền trên dữ liệu. \medskip
 
 \subsection{Ánh xạ giải pháp với vấn đề và người ra quyết định}
 
