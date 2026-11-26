@@ -142,3 +142,34 @@ class TestStopRegistered:
             monkeypatch.setattr(watch.os, "killpg", stop)
         watch.stop_registered(tmp_path)
         assert stopped.index(20) < stopped.index(10)
+
+    def test_label_prefix_stops_only_the_emulator(self, tmp_path, monkeypatch):
+        registration(tmp_path, name="emulator", pid=10, token="pubsub-emulator")
+        registration(tmp_path, name="pipeline", pid=20, token="dataflow_pipeline.py")
+        monkeypatch.setattr(watch.time, "sleep", lambda _: None)
+        live = {10: True, 20: True}
+
+        def snapshot(pid):
+            if not live[pid]:
+                return None, ""
+            return 50.0, "pubsub-emulator" if pid == 10 else "dataflow_pipeline.py"
+
+        monkeypatch.setattr(watch, "process_snapshot", snapshot)
+        stopped = []
+        if watch.os.name == "nt":
+            def stop(args, **kwargs):
+                pid = int(args[2])
+                stopped.append(pid)
+                live[pid] = False
+            monkeypatch.setattr(watch.subprocess, "run", stop)
+        else:
+            def stop(pid, signal):
+                stopped.append(pid)
+                live[pid] = False
+            monkeypatch.setattr(watch.os, "getpgid", lambda pid: pid)
+            monkeypatch.setattr(watch.os, "kill", stop)
+            monkeypatch.setattr(watch.os, "killpg", stop)
+        watch.stop_registered(tmp_path, label_prefix="emulator")
+        assert stopped == [10]
+        assert not (tmp_path / "emulator.json").exists()
+        assert (tmp_path / "pipeline.json").exists()

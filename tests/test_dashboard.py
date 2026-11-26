@@ -157,6 +157,39 @@ def test_funnel_rates_follow_dictionary_numerators():
     assert s["cart_abandonment_rate"] == pytest.approx(1 - 1 / 2)
 
 
+def test_traffic_sums_and_revenue_per_session_use_source_counts():
+    df = _frame(
+        _session(session_id="a", page_view_count=3, view_item_count=5,
+                 is_engaged=1, revenue_usd=60.0),
+        _session(session_id="b", page_view_count=2, view_item_count=1),
+        _session(session_id="c", view_item_count=4, is_engaged=1, revenue_usd=40.0),
+    )
+    s = kpi.summarize(df)
+    assert s["page_views"] == 5
+    assert s["view_item_events"] == 10
+    assert s["engagement_rate"] == pytest.approx(2 / 3)
+    assert s["revenue_per_session_usd"] == pytest.approx(100 / 3)
+
+
+@pytest.mark.parametrize("left_revenue, right_revenue, expected", [
+    (60.0, 20.0, [0.75, 0.25]),
+    (0.0, 0.0, [None, None]),
+])
+def test_revenue_share_uses_each_groups_revenue(left_revenue, right_revenue, expected):
+    df = _frame(
+        _session(session_id="left-1", channel_group="A", revenue_usd=left_revenue / 2),
+        _session(session_id="left-2", channel_group="A", revenue_usd=left_revenue / 2),
+        _session(session_id="right", channel_group="B", revenue_usd=right_revenue),
+    )
+    table = kpi.breakdown(df, "channel_group")
+    assert table["channel_group"].tolist() == ["A", "B"]
+    for got, want in zip(table["revenue_share_total"], expected):
+        if want is None:
+            assert math.isnan(got)
+        else:
+            assert got == pytest.approx(want)
+
+
 def test_undefined_ratios_are_nan():
     s = kpi.summarize(_frame(_session()))
     assert math.isnan(s["aov_usd"])

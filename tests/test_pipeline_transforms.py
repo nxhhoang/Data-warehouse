@@ -17,6 +17,7 @@ from src.pipeline.dataflow_pipeline import (
     NormalizeEventDoFn,
     ParseJsonDoFn,
     load_quality_config,
+    split_batch_payload,
 )
 
 PLACEHOLDERS = ["<Other>", "(data deleted)", "(not set)", ""]
@@ -201,6 +202,20 @@ class TestLoadQualityConfig:
         result = load_quality_config(str(tmp_path / "nope.yaml"))
         assert "user_pseudo_id" in result["event_key_fields"]
         assert "(not set)" in result["placeholder_values"]
+
+
+class TestReplayBatchFraming:
+    def test_preserves_each_original_payload(self):
+        raw = [json.dumps(valid_event()), "{broken", json.dumps(valid_event("view_item"))]
+        payload = json.dumps(raw).encode("utf-8")
+        assert list(split_batch_payload(payload)) == raw
+
+    def test_accepts_the_final_single_payload(self):
+        assert list(split_batch_payload(json.dumps('{"single": true}'))) == ['{"single": true}']
+
+    def test_rejects_non_string_payload_array(self):
+        with pytest.raises(ValueError, match="raw payload strings"):
+            list(split_batch_payload(json.dumps([{"raw": "object instead of string"}])))
 
 
 class TestEndToEndTransforms:

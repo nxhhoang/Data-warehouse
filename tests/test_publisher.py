@@ -6,6 +6,8 @@ to keep the tests fast.
 Run from the repository root:  pytest tests/test_publisher.py
 """
 
+import json
+
 import pytest
 
 import src.extract.publisher as publisher
@@ -122,6 +124,30 @@ class TestPublishAll:
         fake = FakePublisher()
         stats = publish_all(fake, "t", "d", iter([]))
         assert stats == {"published": 0, "failed_to_dlq": 0, "total": 0}
+
+
+class TestReplayBatching:
+    def test_counts_events_and_preserves_payload_strings(self, monkeypatch):
+        monkeypatch.setattr(publisher.time, "sleep", lambda _: None)
+        fake = FakePublisher()
+        payloads = ['{"event_name": "a", "value": 1}', '{broken', '{"event_name": "b"}']
+        stats = publish_all(fake, "projects/p/topics/ga4-events",
+                            "projects/p/topics/ga4-events-dlq", payloads, batch_size=2)
+        assert stats == {"published": 3, "failed_to_dlq": 0, "total": 3}
+        assert len(fake.topic_calls) == 2
+        assert json.loads(fake.topic_calls[0]) == payloads[:2]
+        # In multi-record mode, even a one-event remainder is wrapped as a batch.
+        assert json.loads(fake.topic_calls[1]) == [payloads[2]]
+
+    def test_rejects_non_positive_batch_size(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            list(publisher.batched_payloads(["{}"], 0))
+
+    def test_writes_counters_for_replay_validation(self, tmp_path):
+        stats = {"published": 3, "failed_to_dlq": 0, "total": 3}
+        output = tmp_path / "nested" / "publisher_stats.json"
+        publisher.write_publish_stats(stats, output)
+        assert json.loads(output.read_text(encoding="utf-8")) == stats
 
 
 if __name__ == "__main__":
