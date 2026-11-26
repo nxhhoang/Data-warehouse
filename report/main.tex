@@ -299,7 +299,7 @@ Phụ lục 1 trình bày chi tiết vai trò và bằng chứng cộng tác qua
 
 Phụ lục này phản ánh vai trò thống nhất trong tài liệu phân công của nhóm và minh chứng cộng tác trên repository. Số commit hay số dòng mã không được dùng để suy diễn tỷ lệ lao động hay mức độ hoàn thành cá nhân.
 
-\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.4cm}|>{\raggedright\arraybackslash}p{4.6cm}|>{\raggedright\arraybackslash}X|}
+\begin{xltabular}{\textwidth}{|>{\raggedright\arraybackslash}p{3.1cm}|>{\raggedright\arraybackslash}p{4.2cm}|>{\raggedright\arraybackslash}X|}
 \caption{Phạm vi phụ trách và minh chứng thực hiện}
 \label{tab:teamwork-evidence} \\
 \hline
@@ -318,11 +318,11 @@ Phụ lục này phản ánh vai trò thống nhất trong tài liệu phân cô
 Bùi Trọng Hiển (2310993)
 & Application Developer. Phát triển các tính năng DSS, kiểm thử tổng thể và biên tập demo.
 & Branch \texttt{hien/warehouse-dashboard-fields} và \texttt{hien/dashboard}. Các commit \texttt{c54ef39} về trường người dùng mới/quay lại và mart theo kênh/thiết bị; \texttt{d8d5921} về dựng warehouse trên BigQuery Sandbox. Các commit \texttt{d7f6fc5}, \texttt{46accab}, \texttt{fad0b26}, \texttt{b825b1c}, \texttt{03ed918} lần lượt phát triển và kiểm thử drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. \\
-
+\hline
 Nguyễn Xuân Huy Hoàng (2311070)
 & Data Warehouse \& KPI Engineer. Mô hình kho, tầng KPI, tích hợp pipeline và hạ tầng triển khai.
 & Merge \texttt{f30c272} và \texttt{537924d} để tích hợp các nhánh warehouse/dashboard. Commit \texttt{da06b54} kiểm thử Publisher -- Emulator -- DirectRunner và \texttt{ef86de1} kiểm thử Sandbox cùng đóng gói Docker. Các công việc vận hành liên quan quota, quản lý PID, cấu hình môi trường và tài liệu chạy hệ thống. \\
-
+\hline
 Trần Vĩnh Dũng (2310574)
 & Data Engineer. Biến đổi dữ liệu, thông tin phiên và sản phẩm, hỗ trợ pipeline, chất lượng dữ liệu và dashboard.
 & Phạm vi nghiệp vụ/dashboard được tổ chức qua các trang tổng quan, so sánh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Quá trình nghiệm thu và trình bày demo được thực hiện theo phối hợp chung của nhóm. \\
@@ -330,8 +330,8 @@ Trần Vĩnh Dũng (2310574)
 
 \subsection*{Cách phối hợp}
 
-Nhóm phân chia công việc theo các branch riêng trên GitHub rồi hợp nhất vào \texttt{hoang/warehouse}. Các merge được sử dụng để đưa phần mô hình, khóa và dashboard về cùng một code path thay vì duy trì nhiều bản sao tách biệt. Sau tích hợp, Publisher, DirectRunner, dbt và dashboard được kiểm thử trên cùng một batch dữ liệu. Các thành viên hỗ trợ chéo giữa xử lý dữ liệu, warehouse, dashboard và tài liệu triển khai.
+Nhóm tổ chức phát triển theo từng nhánh độc lập trên GitHub trước khi hợp nhất về nhánh tích hợp \texttt{main}. Chiến lược này giúp đồng bộ toàn bộ phần mô hình dữ liệu, định nghĩa khóa và giao diện dashboard vào một luồng mã nguồn thống nhất, tránh tình trạng phân mảnh thành nhiều phiên bản rời rạc. Sau khi tích hợp, toàn bộ chuỗi xử lý từ Publisher, DirectRunner, dbt đến dashboard đều được kiểm thử đồng bộ trên cùng một batch dữ liệu, đi kèm sự hỗ trợ chéo giữa các thành viên ở các mảng xử lý dữ liệu, kho dữ liệu, trực quan hóa và tài liệu triển khai.\medskip
 
-Sản phẩm tài liệu và trình bày được xây dựng dựa trên kết quả kiểm thử thực tế. Bằng chứng trực tiếp trong repo gồm test pipeline cục bộ, log dbt, kiểm tra KPI view, báo cáo sử dụng BigQuery và replay Docker. Khi trình bày, mỗi phần cần chỉ rõ đâu là dữ liệu toàn kỳ được phân tích, đâu là mẫu validation 100 event, và đâu là phần mở rộng chưa vận hành để người xem không hiểu nhầm phạm vi hoàn thành.
+Nội dung báo cáo và tài liệu trình bày được biên soạn dựa hoàn toàn trên kết quả thực nghiệm thực tế, với các bằng chứng kiểm chứng lưu trực tiếp trong repository bao gồm: kịch bản test pipeline cục bộ, nhật ký chạy (log) dbt, kết quả đối soát KPI view, thống kê sử dụng BigQuery và nhật ký replay trên Docker. Để đảm bảo tính minh bạch về phạm vi hoàn thiện của hệ thống, các phần trình bày đều phân định rõ ràng đâu là số liệu phân tích toàn kỳ, đâu là kết quả từ mẫu kiểm thử nhanh 100 event, và đâu là các hạng mục mở rộng mới dừng ở mức thiết kế chưa đưa vào vận hành thực tế.
 
 \end{document}

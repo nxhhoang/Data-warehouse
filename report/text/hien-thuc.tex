@@ -56,15 +56,15 @@ Quá trình chạy thực hiện như sau:
 
 Việc ghi JSONL trung gian có mục đích rõ ràng: Sandbox không được dùng như một streaming insert endpoint cho luồng này. Batch load từ file vẫn cho phép kiểm tra toàn bộ đường đi của sự kiện mà không thêm một dịch vụ trung chuyển. \medskip
 
-Replay có giới hạn (bounded replay) bổ sung một cổng kiểm tra hoàn tất cho batch đã biết trước số event. Collector đọc message từ subscription của emulator cục bộ, ghi snapshot rồi mới acknowledge từng nhóm message; những redelivery có cùng message ID không được ghi thêm. File này có thể chứa các batch wrapper, nhưng từng raw payload vẫn được decode và xử lý riêng như bình thường. Nếu đã thu đủ snapshot, emulator do script tạo sẽ được dừng để giải phóng RAM, rồi DirectRunner đọc snapshot có giới hạn thay vì đọc một stream không có điểm dừng rõ ràng. Nhánh streaming cho fixture nhỏ vẫn được giữ nguyên. Snapshot ACK chỉ khẳng định rằng dữ liệu đã được thu và ghi vào máy, không thay thế kiểm tra đúng KPI ở phần sau.
+Replay có giới hạn bổ sung một cổng kiểm tra hoàn tất cho batch đã biết trước số event. Collector đọc message từ subscription của emulator cục bộ, ghi snapshot rồi mới acknowledge từng nhóm message; những redelivery có cùng message ID không được ghi thêm. File này có thể chứa các batch wrapper, nhưng từng raw payload vẫn được decode và xử lý riêng như bình thường. Nếu đã thu đủ snapshot, emulator do script tạo sẽ được dừng để giải phóng RAM, rồi DirectRunner đọc snapshot có giới hạn thay vì đọc một stream không có điểm dừng rõ ràng. Nhánh streaming cho fixture nhỏ vẫn được giữ nguyên. Snapshot ACK chỉ khẳng định rằng dữ liệu đã được thu và ghi vào máy, không thay thế kiểm tra đúng KPI ở phần sau.
 
-Trước khi nạp raw, \texttt{verify\_replay\_output.py} đối chiếu số event từ \texttt{publisher\_stats.json} với tổng số event hợp lệ, dead-letter và event bị loại theo quality rule. Việc file không tăng dòng không được xem là bằng chứng replay đã hoàn tất. Nếu đối soát còn thiếu hoặc dư, script dừng trước bước load để tránh tạo warehouse từ một batch không đầy đủ. Các tham số replay giới hạn số event và đặt thời hạn cho publisher, collector và DirectRunner. Đồng thời, watchdog theo dõi RAM, disk cũng như PID của từng tiến trình đăng ký.
+Nhằm đảm bảo tính toàn vẹn dữ liệu trước khi được nạp vào tầng raw, script \texttt{verify\_replay\_output.py} thực hiện đối soát tổng số event phát đi (ghi nhận trong \texttt{publisher\_stats.json}) với tổng lượng event đầu ra, bao gồm: event hợp lệ, event rơi vào dead-letter và event bị loại bởi các quy tắc chất lượng (quality rules). Hệ thống không dựa vào việc file đầu ra ngừng tăng dung lượng hay số dòng để suy đoán quá trình replay đã hoàn tất. Nếu kết quả đối soát có sự sai lệch (thiếu hoặc dư event), script sẽ chủ động ngắt quy trình trước bước load nhằm ngăn chặn việc dựng warehouse từ một batch dữ liệu không trọn vẹn. Ngoài ra, toàn bộ quá trình replay được kiểm soát chặt chẽ về tài nguyên thông qua các tham số giới hạn số lượng event, ngưỡng thời gian chờ (timeout) cho publisher, collector, DirectRunner, kết hợp cùng tiến trình watchdog giám sát liên tục mức tiêu thụ RAM, dung lượng đĩa và trạng thái PID của các tiến trình đã đăng ký.
 
 \subsection{Cài đặt và chạy thủ công}
 
-Người dùng làm lần đầu cần Python 3.11 trở lên, Git Bash trên Windows, JDK phù hợp emulator, gcloud CLI cùng component \texttt{pubsub-emulator} và \texttt{beta}. BigQuery Sandbox cần project ID thật và đăng nhập Google, nhưng luồng fixture không cần tài khoản Google. \medskip
+Đối với lần đầu triển khai hệ thống, môi trường thực thi cần chuẩn bị sẵn Python 3.11 trở lên, Git Bash (nếu chạy trên Windows), phiên bản JDK tương thích với Pub/Sub emulator, cùng công cụ \texttt{gcloud CLI} tích hợp hai component \texttt{pubsub-emulator} và \texttt{beta}. Về tài khoản, chế độ BigQuery Sandbox yêu cầu người dùng đăng nhập Google và khai báo một Project ID hợp lệ; trong khi đó, luồng kiểm thử bằng dữ liệu mẫu (fixture) có thể vận hành độc lập mà không cần tài khoản Google. \medskip
 
-Hai việc đăng nhập có phạm vi khác nhau: \texttt{gcloud auth login} thiết lập CLI, còn \texttt{gcloud auth application-default login} thiết lập ADC cho Python/dbt/dashboard. Sau khi chọn project, cài môi trường và dataset: \medskip
+Cần lưu ý rằng hai bước xác thực trên \texttt{gcloud} phục vụ hai phạm vi khác nhau: lệnh \texttt{gcloud auth login} cấp quyền thao tác trực tiếp cho công cụ dòng lệnh CLI, còn \texttt{gcloud auth application-default login} thiết lập thông tin xác thực mặc định (ADC) để các thư viện Python, dbt và dashboard có thể kết nối tới dịch vụ đám mây. Sau khi cấu hình xong project, người dùng tiến hành thiết lập môi trường và khởi tạo dataset theo các bước sau: \medskip
 
 \begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
 bash scripts/setup_venv.sh
@@ -118,11 +118,11 @@ Dataset test mới giúp tránh ghi đè batch trước. Nếu dùng lại datas
 
 \subsection{Dữ liệu hiển thị và Looker Studio}
 
-Bản dashboard hiện thực là Streamlit. Người dùng có thể sử dụng để lọc thời gian, kênh, nguồn/medium, thiết bị, quốc gia và các chiều phân tích khác phù hợp từng trang. Các trang bao gồm tổng quan, so sánh hiệu suất, chất lượng kênh, phễu, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Tab CMO/Manager/Specialist chỉ thay đổi nhóm trang hiển thị; nó không phải lớp phân quyền. \medskip
+Giao diện dashboard chính của hệ thống được xây dựng trên nền tảng Streamlit, cho phép người dùng tương tác và lọc dữ liệu linh hoạt theo khoảng thời gian, kênh tiếp thị, nguồn/medium, thiết bị, quốc gia cùng nhiều chiều phân tích chuyên biệt cho từng trang. Hệ thống được tổ chức thành 9 trang chức năng: tổng quan, so sánh hiệu suất, chất lượng kênh, phễu chuyển đổi, drill-down, phân khúc, cảnh báo, mô phỏng và truy vết. Lưu ý rằng các tab điều hướng theo vai trò (CMO, Manager, Specialist) chỉ có tác dụng nhóm và lọc giao diện trang hiển thị tương ứng với góc nhìn nghiệp vụ, không đóng vai trò là cơ chế phân quyền bảo mật. \medskip
 
-Luồng hiển thị gồm hai nhánh từ cùng kho dữ liệu. BigQuery Core/Marts là đầu vào của dashboard Streamlit. Ba KPI view được dùng để xuất CSV rồi đưa vào Looker Studio, tạo thành nhánh trình bày báo cáo có thể cập nhật lại bằng một lần xuất CSV mới. \medskip
+Từ cùng một kho dữ liệu tập trung, luồng hiển thị được tách thành hai nhánh phục vụ hai mục đích khác nhau: các bảng ở tầng BigQuery Core/Marts cung cấp dữ liệu trực tiếp cho ứng dụng Streamlit tương tác; trong khi đó, ba KPI view được dùng để xuất định dạng CSV phục vụ báo cáo trên Looker Studio, cho phép cập nhật nhanh số liệu trình bày chỉ bằng một thao tác xuất file mới. \medskip
 
-Với nhu cầu trình bày bằng Looker Studio trong giới hạn không bật billing, có thể xuất các kết quả tổng hợp thành CSV từ BigQuery Console rồi tải file lên Looker Studio dưới dạng dữ liệu tệp tín. Các view gồm:
+Cụ thể, để đáp ứng nhu cầu trình bày trên Looker Studio trong giới hạn môi trường không kích hoạt billing, người dùng có thể xuất trực tiếp kết quả tổng hợp từ BigQuery Console ra tệp CSV và tải lên Looker Studio dưới dạng nguồn dữ liệu tệp tin (File Upload). Ba KPI view được sử dụng cho luồng này bao gồm:
 
 \begin{itemize}
   \item \texttt{v\_kpi\_traffic\_engagement}
@@ -130,5 +130,5 @@ Với nhu cầu trình bày bằng Looker Studio trong giới hạn không bật
   \item \texttt{v\_kpi\_conversion\_revenue}
 \end{itemize}
 
-\texttt{event\_date} dùng làm trường ngày, còn kênh và thiết bị làm chiều phân tích. Khi gộp nhiều dòng, tỷ lệ phải được tính lại từ số đếm/doanh thu, không lấy trung bình các tỷ lệ đã tính sẵn. CSV tĩnh là cách chia sẻ snapshot, không phải kết nối live BigQuery phải cập nhật tự động. 
+Trong các báo cáo này, trường \texttt{event\_date} đóng vai trò là trục thời gian, trong khi kênh tiếp thị và loại thiết bị được sử dụng làm các chiều phân tích chính. Khi thực hiện gom nhóm nhiều dòng dữ liệu ở tầng hiển thị, các chỉ số tỷ lệ bắt buộc phải được tính toán lại từ tổng các thành phần gốc (số đếm hoặc doanh thu) thay vì lấy trung bình cộng của các tỷ lệ đã tính sẵn, nhằm tránh sai lệch thống kê. Cần lưu ý rằng việc xuất tệp CSV tĩnh chỉ đóng vai trò chia sẻ một bản chụp dữ liệu (snapshot) tại thời điểm xuất, chứ không thiết lập kết nối trực tiếp (live connection) để tự động đồng bộ với BigQuery.
 
