@@ -145,7 +145,7 @@ JOIN `{project}.core.dim_product` p ON f.product_key = p.product_key
 JOIN `{project}.core.dim_traffic_source` ts ON f.session_source_key = ts.traffic_source_key
 JOIN `{project}.core.dim_device` dev ON f.device_key = dev.device_key
 WHERE f.date_key > 0
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
 """
 
 

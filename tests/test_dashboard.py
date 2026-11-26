@@ -6,6 +6,7 @@ Run from the repository root:  pytest tests/test_dashboard.py
 """
 
 import math
+import sqlite3
 
 import pytest
 
@@ -14,7 +15,7 @@ pytest.importorskip("yaml")
 
 from src.dashboard import kpi  # noqa: E402
 from src.dashboard.config import CHANNEL_GROUPS, Settings  # noqa: E402
-from src.dashboard.data import (DERIVED_SESSION_COLUMNS, PRODUCT_COLUMNS,  # noqa: E402
+from src.dashboard.data import (DERIVED_SESSION_COLUMNS, PRODUCT_COLUMNS, PRODUCTS_SQL,  # noqa: E402
                                 SESSION_COLUMNS, coerce, load_products, load_sessions)
 from src.dashboard.filters import Filters, apply_filters, apply_product_filters  # noqa: E402
 from src.dashboard.formatting import fmt_delta, fmt_value  # noqa: E402
@@ -118,6 +119,62 @@ def test_coerce_fills_nulls_and_rejects_missing_columns():
     assert df.loc[0, "revenue_usd"] == 0.0
     with pytest.raises(KeyError):
         coerce(pd.DataFrame({"session_id": ["x"]}), SESSION_COLUMNS)
+
+
+def test_product_sql_groups_only_dimension_columns():
+    """Run the real product query with duplicate measures per source grain."""
+    connection = sqlite3.connect(":memory:")
+    connection.create_function(
+        "CONCAT", -1,
+        lambda *parts: None if any(part is None for part in parts)
+        else "".join(str(part) for part in parts),
+    )
+    try:
+        connection.executescript("""
+            CREATE TABLE dim_date (date_key INTEGER, full_date TEXT);
+            INSERT INTO dim_date VALUES (20201218, '2020-12-18');
+            CREATE TABLE dim_product (
+                product_key INTEGER, item_id TEXT, item_name TEXT,
+                item_brand TEXT, item_category TEXT
+            );
+            INSERT INTO dim_product VALUES (1, 'SKU-1', 'Tee', 'Google', 'Apparel');
+            CREATE TABLE dim_traffic_source (
+                traffic_source_key INTEGER, channel_group TEXT,
+                source TEXT, medium TEXT, campaign TEXT
+            );
+            INSERT INTO dim_traffic_source VALUES
+                (1, 'Organic Search', 'google', 'organic', 'launch'),
+                (2, 'Direct', '(direct)', '(none)', 'default');
+            CREATE TABLE dim_device (device_key INTEGER, device_category TEXT);
+            INSERT INTO dim_device VALUES (1, 'desktop');
+            CREATE TABLE fct_product_channel_daily (
+                date_key INTEGER, product_key INTEGER,
+                session_source_key INTEGER, device_key INTEGER,
+                item_view_events INTEGER, item_add_to_cart_events INTEGER,
+                item_checkout_events INTEGER, units_sold INTEGER,
+                item_revenue_usd REAL
+            );
+            INSERT INTO fct_product_channel_daily VALUES
+                (20201218, 1, 1, 1, 3, 1, 1, 1, 10.00),
+                (20201218, 1, 1, 1, 5, 1, 1, 2, 10.50),
+                (20201218, 1, 2, 1, 4, 0, 0, 1, 7.25);
+        """)
+        sql = (PRODUCTS_SQL.format(project="example")
+               .replace("example.", "").replace("marts.", "").replace("core.", "")
+               .replace("`", ""))
+        out = pd.read_sql_query(sql, connection)
+    finally:
+        connection.close()
+
+    assert len(out) == 2
+    assert list(out.columns) == list(PRODUCT_COLUMNS)
+    actual = out.set_index("source_medium")
+    assert actual.loc["google / organic", "item_view_events"] == 8
+    assert actual.loc["google / organic", "units_sold"] == 3
+    assert actual.loc["google / organic", "item_revenue_usd"] == pytest.approx(20.50)
+    assert actual.loc["(direct) / (none)", "item_view_events"] == 4
+    assert actual.loc["(direct) / (none)", "item_revenue_usd"] == pytest.approx(7.25)
+    assert out["item_revenue_usd"].sum() == pytest.approx(27.75)
 
 
 # ---------- KPI formulas (kpi_dictionary.yaml) ----------

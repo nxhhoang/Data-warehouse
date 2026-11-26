@@ -24,7 +24,7 @@ Mốc thời gian 18/12/2020 được lựa chọn làm dữ liệu kiểm thử
 \endlastfoot
 
 Unit test và workflow
-& 188 test Pytest pass trong chế độ offline. Fixture 9 dòng tạo đúng 4 valid event, 2 dead-letter và 4 quality-log row. Test cũng bao phủ công thức KPI, guard ghi đè, bounded collector và xuất CSV. Dashboard có regression test cho \texttt{management\_role = None}, chuyển role, giữ bộ lọc sau khi đổi role, lọc nguồn/chiến dịch và nhóm sản phẩm. Workflow thu nhận toàn bộ test bằng \texttt{pytest tests/ -v}. \\
+& 189 test Pytest pass trong chế độ offline. Fixture 9 dòng tạo đúng 4 valid event, 2 dead-letter và 4 quality-log row. Test cũng bao phủ công thức KPI, guard ghi đè, bounded collector và xuất CSV. Dashboard có regression test cho \texttt{management\_role = None}, chuyển role, giữ bộ lọc sau khi đổi role, lọc nguồn/chiến dịch và nhóm sản phẩm. Test thực thi SQL sản phẩm cũng kiểm tra \texttt{GROUP BY} chỉ gồm các cột dimension, không nhầm cột tổng hợp. Workflow thu nhận toàn bộ test bằng \texttt{pytest tests/ -v}. \\
 
 Replay đầy đủ
 & Publisher nhận thành công 56.742/56.742 event, không có event nào bị đẩy sang DLQ. Collector thu 887 message và ghi đủ snapshot. Sau DirectRunner, có 56.741 event hợp lệ, 1 event bị loại vì thiếu transaction ID và 0 dead-letter. Cổng đối soát xác nhận $56.742 = 56.741 + 1 + 0$ trước khi nạp raw. \\
