@@ -63,7 +63,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run unit tests
+      - name: Run unit, replay-safety, and report KPI formula tests (offline)
+        # Includes direct execution of the three KPI view SQL files with SQLite.
         run: pytest tests/ -v
 
       - name: Check bounded benchmark CLI (no BigQuery calls)
